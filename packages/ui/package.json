@@ -1,0 +1,22 @@
+{
+  "name": "@liji-table/ui",
+  "version": "0.0.2",
+  "type": "module",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "style": "src/styles.css",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc" 
+  },
+  "dependencies": {
+    "@liji-table/core": "*",
+    "react": "^18.0.0"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css",
+    "./UniversalTable": "./src/UniversalTable.tsx",
+    "./UniversalTableToolbar": "./src/UniversalTableToolbar.tsx"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "liji-table-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.1",
+    "happy-dom": "^20.0.11",
+    "jsdom": "^27.4.0",
+    "vitest": "^4.0.16"
+  }
+}

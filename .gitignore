@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+.cache/
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Package manager
+.npmrc
+.yarnrc
+package-lock.json
+yarn.lock
+
+# Angular specific
+.angular/
+
+# Exclude examples and documentation site (not needed in git)
+examples/
+lijitable-docs/
+
+# Artifacts directory (local only)
+C:/Users/

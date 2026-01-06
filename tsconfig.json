@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "target": "ESNext",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "strict": true,
+    "declaration": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@liji-table/core": ["packages/core/src/index.ts"],
+      "@liji-table/react": ["packages/react/src/index.ts"],
+      "@liji-table/angular": ["packages/angular/src/public-api.ts"],
+      "@liji-table/ui": ["packages/ui/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", "dist"]
+}

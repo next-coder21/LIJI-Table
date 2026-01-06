@@ -1,0 +1,320 @@
+/* --- 1. Variables --- */
+:root {
+  --liji-bg: #f8f9fa;       
+  --liji-white: #ffffff;
+  --liji-border: #eaecf0;   
+  --liji-text-main: #101828;
+  --liji-text-sub: #667085;
+  --liji-primary: #3b82f6;
+  --liji-hover-row: #f9fafb;
+  --liji-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --liji-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* --- GLOBAL RESET FOR THIS COMPONENT --- */
+.liji-grid-wrapper, .liji-grid-wrapper * {
+  box-sizing: border-box;
+}
+
+/* --- 2. Wrapper (The Main Container) --- */
+.liji-grid-wrapper {
+  background: var(--liji-white);
+  border: 1px solid var(--liji-border);
+  border-radius: 12px;     
+  box-shadow: var(--liji-shadow-sm);
+  
+  /* Flexbox Layout: Stacks Table on top of Footer */
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  
+  /* CONSTRAINT: Force wrapper to fit parent width */
+  width: 100%;
+  max-width: 100%;
+  
+  /* Prevents the whole page from scrolling horizontally */
+  overflow: hidden; 
+}
+
+/* --- THE SCROLL CONTAINER (The Middle "Red Box") --- */
+.liji-table-scroll {
+  flex: 1;
+  overflow: auto; 
+  width: 100%;
+  max-height: 70vh; /* Adjust as needed */
+  scroll-behavior: smooth;
+}
+
+/* --- 3. The Table --- */
+.liji-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate; /* Required for sticky headers */
+  border-spacing: 0;
+  table-layout: fixed;   
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  text-align: left;
+}
+
+/* --- 4. Header --- */
+.liji-table thead {
+  background-color: #fcfcfd; 
+}
+
+.liji-table thead th {
+  /* STICKY HEADER LOGIC */
+  position: sticky !important;
+  top: 0;
+  z-index: 10; 
+  
+  background-color: #fcfcfd; 
+  background-clip: padding-box;
+  
+  color: var(--liji-text-sub);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 12px 24px;      
+  user-select: none;
+  
+  border-bottom: 1px solid var(--liji-border);
+  border-right: 1px solid var(--liji-border); 
+}
+
+.liji-table thead th:last-child { border-right: none; }
+
+/* Header Content Alignment */
+.liji-th-content { 
+  display: flex; 
+  align-items: center; 
+  width: 100%; 
+  cursor: grab; 
+}
+.liji-th-content:active { cursor: grabbing; }
+
+/* Dragging Visuals */
+th.liji-drag-over { 
+  background-color: #eff8ff !important; 
+  border-left: 2px solid var(--liji-primary); 
+}
+.liji-dragging { opacity: 0.5; }
+
+/* --- 5. Body --- */
+.liji-table tbody tr { transition: background 0.1s ease; }
+.liji-table tbody tr:hover { background-color: var(--liji-hover-row); }
+
+.liji-table td {
+  padding: 16px 24px;      
+  color: var(--liji-text-main);
+  font-size: 0.875rem;
+  vertical-align: middle;
+  background-color: var(--liji-white); /* Important for sticky columns */
+  
+  border-bottom: 1px solid var(--liji-border);
+  border-right: 1px solid var(--liji-border);
+
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  white-space: nowrap; 
+}
+
+.liji-table td:last-child { border-right: none; }
+.liji-table tbody tr:last-child td { border-bottom: none; }
+
+/* --- 6. PINNED COLUMNS (New) --- */
+/* These classes ensure pinned columns have separation */
+.liji-pinned-left {
+  position: sticky; /* Missing this! */
+  left: 0;          /* You will need dynamic calculations if multiple cols are pinned */
+  z-index: 2;
+  background-color: var(--liji-white); /* Important so text doesn't flow under it */
+  border-right: 2px solid #d0d5dd !important; 
+}
+.liji-pinned-right {
+  border-left: 2px solid #d0d5dd !important;
+  z-index: 2;
+}
+/* Ensure header pinned columns sit above regular sticky headers */
+.liji-table thead th.liji-pinned-left,
+.liji-table thead th.liji-pinned-right {
+  z-index: 20; 
+}
+
+
+/* --- 7. Resizer --- */
+.liji-resizer {
+  position: absolute; right: 0; top: 0; height: 100%; width: 4px;              
+  cursor: col-resize; touch-action: none; z-index: 20;
+}
+.liji-resizer:hover, .liji-resizer.is-resizing { 
+  background-color: var(--liji-primary); 
+  opacity: 1; 
+}
+
+/* --- 8. CONTEXT MENU (New) --- */
+.liji-context-menu {
+  position: fixed;
+  background: var(--liji-white);
+  border: 1px solid var(--liji-border);
+  border-radius: 8px;
+  box-shadow: var(--liji-shadow-lg);
+  z-index: 1000;
+  width: 180px;
+  padding: 4px 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #344054;
+}
+
+.liji-menu-header {
+  padding: 6px 12px; 
+  font-size: 11px; 
+  color: #98a2b3; 
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.liji-menu-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.1s;
+}
+
+.liji-menu-item:hover {
+  background: #f9fafb;
+  color: var(--liji-text-main);
+}
+
+.liji-menu-item span {
+  color: #98a2b3;
+  width: 16px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.liji-menu-divider {
+  height: 1px;
+  background: var(--liji-border);
+  margin: 4px 0;
+}
+
+/* --- 9. Components (Avatars, Badges) --- */
+.liji-user-cell { display: flex; align-items: center; gap: 12px; }
+.liji-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: #f2f4f7; color: #475467;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 0.85rem;
+}
+
+.liji-badge { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 16px; font-size: 0.8rem; font-weight: 500; }
+.liji-badge.green { background: #ecfdf3; color: #027a48; }
+.liji-badge.blue  { background: #eff8ff; color: #175cd3; }
+.liji-badge.gray  { background: #f2f4f7; color: #344054; }
+
+.liji-actions { display: flex; gap: 12px; justify-content: flex-end; opacity: 0.7; }
+.liji-actions:hover { opacity: 1; }
+.liji-icon-btn { background: none; border: none; cursor: pointer; color: #98a2b3; padding: 4px; transition: color 0.2s; }
+.liji-icon-btn:hover { color: var(--liji-primary); }
+.liji-icon-btn.delete:hover { color: #d92d20; }
+
+/* --- 10. The Footer --- */
+.liji-footer {
+  flex-shrink: 0; 
+  width: 100%; 
+  padding: 12px 24px;
+  background: #fcfcfd; 
+  border-top: 1px solid var(--liji-border);
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center;
+  font-size: 0.875rem; 
+  color: var(--liji-text-sub);
+  z-index: 20;
+}
+
+.liji-btn-page {
+  padding: 8px 14px; 
+  background: white; 
+  border: 1px solid var(--liji-border); 
+  border-radius: 8px;
+  color: var(--liji-text-main); 
+  cursor: pointer; 
+  font-size: 0.875rem; 
+  font-weight: 500;
+  transition: all 0.2s; 
+  box-shadow: var(--liji-shadow-sm);
+}
+.liji-btn-page:disabled { opacity: 0.5; cursor: not-allowed; background-color: #f9fafb; }
+.liji-btn-page:hover:not(:disabled) { background-color: #f9fafb; border-color: #d0d5dd; color: #101828; }
+
+.liji-table.liji-compact td, 
+.liji-table.liji-compact th {
+  padding: 8px 12px;
+  font-size: 0.8rem;
+}
+
+.liji-table.liji-comfortable td, 
+.liji-table.liji-comfortable th {
+  padding: 20px 32px;
+  font-size: 1rem;
+}
+
+.liji-table.liji-striped tbody tr:nth-child(even) td {
+  background-color: #fafafa; /* Very light gray */
+}
+/* Ensure sticky columns keep the stripe color */
+.liji-table.liji-striped tbody tr:nth-child(even) td.liji-pinned-left,
+.liji-table.liji-striped tbody tr:nth-child(even) td.liji-pinned-right {
+  background-color: #fafafa;
+}
+
+/* --- NEW: Filter Row --- */
+.liji-filter-row th {
+  padding: 4px 8px !important;
+  background: #f9fafb;
+  border-bottom: 1px solid var(--liji-border);
+}
+.liji-filter-input {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.liji-filter-input:focus {
+  outline: none;
+  border-color: var(--liji-primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.liji-th-checkbox,
+.liji-td-checkbox {
+  width: 40px !important;      /* Force small width */
+  min-width: 40px !important;
+  max-width: 40px !important;
+  padding: 0 !important;       /* Remove excess padding */
+  text-align: center;
+  position: sticky !important;
+  left: 0;
+  z-index: 1;                 /* Ensure it stays above other content */
+  background: var(--liji-white);
+  border-right: 1px solid var(--liji-border);
+}
+
+.liji-th-checkbox {
+  z-index: 30; /* Header checkbox stays highest */
+  background: #fcfcfd; /* Match header bg */
+}
+
+/* Center the input inside the cell */
+.liji-th-checkbox input,
+.liji-td-checkbox input {
+  cursor: pointer;
+  margin: 0;
+  transform: translateY(2px); /* Slight visual alignment */
+}
