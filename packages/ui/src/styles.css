@@ -48,7 +48,14 @@
 /* --- 3. The Table --- */
 .liji-table {
   width: max-content;
-  min-width: 100%;
+  /* NOTE: every column - resized or not - always gets an explicit pixel
+     `width` computed in JS (see computeAutoFitWidths in @liji-table/core),
+     so this never relies on the browser's own table-layout: fixed
+     leftover-redistribution to auto-fit the container. That native
+     behavior used to spread any shortfall across *every* column on each
+     reflow (even ones the user had just manually resized), which is what
+     made a resize handle lag behind the cursor and unrelated columns
+     shift mid-drag. */
   border-collapse: separate; /* Required for sticky headers */
   border-spacing: 0;
   table-layout: fixed;   

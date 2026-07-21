@@ -1,6 +1,36 @@
-import { UniversalTableCore, TableState, TableColumn, ColumnAlign, SortDirection } from '@liji-table/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { UniversalTableCore, TableState, TableColumn, ColumnAlign, SortDirection, LayoutSnapshot, computeAutoFitWidths, GroupRow } from '@liji-table/core';
+import { BehaviorSubject, Observable, combineLatest } from 'rxjs';
 import { map } from 'rxjs/operators';
+
+const LAYOUT_STORAGE_PREFIX = 'liji-table:layout:';
+
+function loadLayoutFromStorage(key: string): LayoutSnapshot | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(LAYOUT_STORAGE_PREFIX + key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLayoutToStorage(key: string, snapshot: LayoutSnapshot) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(LAYOUT_STORAGE_PREFIX + key, JSON.stringify(snapshot));
+  } catch {
+    // localStorage unavailable (quota exceeded, private mode, etc.) - fail silently
+  }
+}
+
+function clearLayoutFromStorage(key: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(LAYOUT_STORAGE_PREFIX + key);
+  } catch {
+    // ignore
+  }
+}
 
 export class UniversalTable<T extends { id: any }> {
   // 1. Internal Brain
@@ -13,8 +43,26 @@ export class UniversalTable<T extends { id: any }> {
   // 3. UI Helpers
   public isResizing = false;
 
-  constructor(data: T[], columns: TableColumn[] = []) {
+  // 4. Layout Persistence
+  private persistKey?: string;
+  private initialColumns: TableColumn[];
+
+  // 5. Auto-Fit Column Widths
+  private containerWidthSubject = new BehaviorSubject<number>(0);
+  public containerWidth$ = this.containerWidthSubject.asObservable();
+  private reservedWidth: number;
+
+  constructor(data: T[], columns: TableColumn[] = [], persistKey?: string, reservedWidth: number = 0) {
     this.core = new UniversalTableCore(data, columns);
+    this.persistKey = persistKey;
+    this.initialColumns = columns;
+    this.reservedWidth = reservedWidth;
+
+    if (persistKey) {
+      const savedLayout = loadLayoutFromStorage(persistKey);
+      if (savedLayout) this.core.applyLayoutSnapshot(savedLayout);
+    }
+
     this.stateSubject = new BehaviorSubject(this.core.getState());
     this.state$ = this.stateSubject.asObservable();
 
@@ -24,14 +72,61 @@ export class UniversalTable<T extends { id: any }> {
     });
   }
 
+  // --- Layout Persistence ---
+  /** Persist the current column arrangement to localStorage (requires `persistKey` to have been passed to the constructor). */
+  saveLayout() {
+    if (!this.persistKey) {
+      console.warn('[Liji Table] saveLayout() requires a `persistKey` to be passed to the UniversalTable constructor.');
+      return;
+    }
+    saveLayoutToStorage(this.persistKey, this.core.getLayoutSnapshot());
+  }
+
+  /** Clear the saved layout and restore the original column arrangement. */
+  resetLayout() {
+    if (this.persistKey) clearLayoutFromStorage(this.persistKey);
+    this.core.setState({ columns: this.initialColumns, columnWidths: {} });
+  }
+
+  hasSavedLayout(): boolean {
+    return !!this.persistKey && loadLayoutFromStorage(this.persistKey) !== null;
+  }
+
+  get persistEnabled(): boolean {
+    return !!this.persistKey;
+  }
+
+  // --- Auto-Fit Column Widths ---
+  /** Call with the scrolling wrapper's current clientWidth (e.g. from a ResizeObserver) so un-resized columns can proportionally fill it. */
+  updateContainerWidth(px: number) {
+    if (this.containerWidthSubject.value !== px) this.containerWidthSubject.next(px);
+  }
+
+  /** Width (px) to reserve for elements outside the column list, e.g. a checkbox column. */
+  setReservedWidth(px: number) {
+    this.reservedWidth = px;
+  }
+
+  /** Synchronously compute the current pixel width for every visible column - see computeAutoFitWidths in @liji-table/core. */
+  getComputedColumnWidths(): Record<string, number> {
+    const state = this.stateSubject.value;
+    return computeAutoFitWidths(state.columns, state.columnWidths, this.containerWidthSubject.value, this.reservedWidth);
+  }
+
+  /** Reactive stream of getComputedColumnWidths(), recomputed whenever state or container width changes. */
+  get computedColumnWidths$(): Observable<Record<string, number>> {
+    return combineLatest([this.state$, this.containerWidth$]).pipe(
+      map(([state, containerWidth]) => computeAutoFitWidths(state.columns, state.columnWidths, containerWidth, this.reservedWidth))
+    );
+  }
+
   // --- Data Sync ---
   setData(data: T[]) {
     this.core.setData(data);
   }
 
   // --- Getters ---
-  // --- Getters ---
-  get rows(): T[] { return this.core.getRows(); }
+  get rows(): (T | GroupRow<T>)[] { return this.core.getRows(); }
   get totalPages(): number { return this.core.getTotalPages(); }
 
   // Virtualization State
@@ -39,7 +134,7 @@ export class UniversalTable<T extends { id: any }> {
   private containerHeight = 800;
   private rowHeight = 48;
 
-  get virtualRows(): T[] {
+  get virtualRows(): (T | GroupRow<T>)[] {
     const allRows = this.core.getRows();
     const startIndex = Math.max(0, Math.floor(this.scrollTop / this.rowHeight) - 5);
     const endIndex = Math.min(allRows.length, Math.ceil((this.scrollTop + this.containerHeight) / this.rowHeight) + 5);
@@ -93,7 +188,7 @@ export class UniversalTable<T extends { id: any }> {
   toggleSelection(id: number) { this.core.toggleSelection(id); }
   toggleAllPage() { this.core.toggleAllPage(); }
   isAllPageSelected() {
-    const rows = this.core.getRows();
+    const rows = this.core.getRows().filter((r): r is T => !(r as any).isGroup); // only leaf rows are selectable
     return rows.length > 0 && rows.every(r => this.stateSubject.value.selectedIds.includes(r.id));
   }
 
@@ -127,7 +222,7 @@ export class UniversalTable<T extends { id: any }> {
     const col = cols.find(c => c.id === colId);
     if (!col || !col.pinned) return {};
 
-    const widths = this.stateSubject.value.columnWidths;
+    const widths = this.getComputedColumnWidths();
     const style: any = { position: 'sticky', zIndex: 2 };
 
     if (col.pinned === 'left') {
@@ -160,8 +255,30 @@ export class UniversalTable<T extends { id: any }> {
     document.body.style.cursor = 'col-resize';
 
     const startX = event.pageX;
-    const startWidth = this.stateSubject.value.columnWidths[colId] || 150;
     const headerNode = (event.target as HTMLElement).closest('th');
+    if (!headerNode) return;
+
+    // 🧊 FREEZE: every column not yet in `columnWidths` is "auto" and
+    // proportionally fills the container by default (getComputedColumnWidths).
+    // The instant a resize drag starts, commit every column's CURRENT
+    // computed width into `columnWidths` - converting them all to "manual"
+    // at their present size - so only the column being dragged can change
+    // from here on. The table's total width simply grows/shrinks with it
+    // (the scroll wrapper handles overflow); no other column is ever
+    // recomputed as a side effect of this one drag.
+    const state = this.stateSubject.value;
+    const computed = this.getComputedColumnWidths();
+    const frozenWidths: Record<string, number> = {};
+    state.columns.forEach(c => {
+      if (state.columnWidths[c.id] == null) frozenWidths[c.id] = computed[c.id];
+    });
+    if (Object.keys(frozenWidths).length > 0) {
+      this.core.setColumnWidths(frozenWidths);
+    }
+
+    // Start from the column's current computed width (not a stale default),
+    // so there's no jump the instant the drag begins.
+    const startWidth = computed[colId] ?? headerNode.getBoundingClientRect().width;
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       if (!headerNode) return;

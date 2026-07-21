@@ -53,6 +53,76 @@ export interface SortEntry {
   direction: 'asc' | 'desc';
 }
 
+/**
+ * Serializable snapshot of the column arrangement (order, width, pin, hidden, align).
+ * Used to persist and restore a user's column layout (v0.0.8+).
+ */
+export interface LayoutSnapshot {
+  columns: {
+    id: string;
+    hidden?: boolean;
+    pinned?: 'left' | 'right' | null;
+    align?: ColumnAlign;
+  }[];
+  columnWidths: Record<string, number>;
+}
+
+/**
+ * Compute the actual pixel width to render for every visible column.
+ *
+ * Columns present in `columnWidths` (i.e. the user has manually dragged
+ * their resize handle at some point) keep that exact pixel value forever,
+ * unaffected by anything else. Any column NOT in `columnWidths` is "auto":
+ * the leftover container space (containerWidth - reservedWidth - sum of
+ * manual widths) is split among the auto columns proportionally to their
+ * configured `width` (default 150), so the table fills its container by
+ * default with no configuration needed.
+ *
+ * This deliberately replaces relying on the browser's native
+ * `table-layout: fixed` leftover-redistribution behavior, which spreads
+ * any shortfall across *every* column (including ones the user just
+ * manually sized) on every reflow - that's what caused a column's resize
+ * handle to lag behind the cursor and unrelated columns to shift during a
+ * drag. With this function, every column always gets an explicit pixel
+ * width, so there is never a "leftover" for the browser to redistribute,
+ * and dragging one column can only ever change that one column.
+ */
+export function computeAutoFitWidths(
+  columns: TableColumn[],
+  columnWidths: Record<string, number>,
+  containerWidth: number,
+  reservedWidth: number = 0
+): Record<string, number> {
+  const visible = columns.filter(c => !c.hidden);
+  const result: Record<string, number> = {};
+  const autoCols: TableColumn[] = [];
+  let manualSum = 0;
+
+  visible.forEach(c => {
+    const stored = columnWidths[c.id];
+    if (stored != null) {
+      result[c.id] = stored;
+      manualSum += stored;
+    } else {
+      autoCols.push(c);
+    }
+  });
+
+  if (autoCols.length === 0) return result;
+
+  const available = Math.max(0, containerWidth - reservedWidth - manualSum);
+  const autoDefaultTotal = autoCols.reduce((sum, c) => sum + (c.width || 150), 0) || 1;
+
+  autoCols.forEach(c => {
+    const defaultW = c.width || 150;
+    const minW = c.minWidth || 50;
+    const share = (defaultW / autoDefaultTotal) * available;
+    result[c.id] = Math.max(minW, Math.round(share));
+  });
+
+  return result;
+}
+
 export interface TableState {
   columns: TableColumn[];
   columnWidths: Record<string, number>;
@@ -492,6 +562,19 @@ export class LijiTable<T extends { id: any }> {
     });
   }
 
+  /**
+   * Batch-set multiple column widths in a single update (one notify/re-render).
+   * Used to "freeze" every column's currently-rendered pixel width the instant
+   * a resize drag starts, so the browser's fixed-table-layout auto-fit
+   * (which otherwise redistributes leftover space across every column on
+   * each reflow) can't shift columns other than the one being dragged.
+   */
+  setColumnWidths(widths: Record<string, number>) {
+    this.setState({
+      columnWidths: { ...this.state.columnWidths, ...widths }
+    });
+  }
+
   toggleVisibility(colId: string) {
     const columns = this.state.columns.map(c =>
       c.id === colId ? { ...c, hidden: !c.hidden } : c
@@ -556,6 +639,49 @@ export class LijiTable<T extends { id: any }> {
       newWidths[col.id] = Math.max(50, Math.min(300, maxContentLen * 10)); // Clamp 50-300
     });
     this.setState({ columnWidths: { ...this.state.columnWidths, ...newWidths } });
+  }
+
+  // --- LAYOUT PERSISTENCE ---
+
+  /**
+   * Capture the current column arrangement (order, width, pin, hidden, align)
+   * as a serializable snapshot that can be saved and restored later.
+   */
+  getLayoutSnapshot(): LayoutSnapshot {
+    return {
+      columns: this.state.columns.map(c => ({
+        id: c.id,
+        hidden: c.hidden,
+        pinned: c.pinned,
+        align: c.align
+      })),
+      columnWidths: { ...this.state.columnWidths }
+    };
+  }
+
+  /**
+   * Restore a previously captured layout snapshot.
+   * Columns present in the snapshot are reordered/updated to match it;
+   * any columns not present in the snapshot (e.g. added later) are appended at the end.
+   */
+  applyLayoutSnapshot(snapshot: LayoutSnapshot) {
+    const remaining = new Map(this.state.columns.map(c => [c.id, c]));
+    const orderedColumns: TableColumn[] = [];
+
+    snapshot.columns.forEach(s => {
+      const col = remaining.get(s.id);
+      if (!col) return; // column no longer exists, skip
+      orderedColumns.push({ ...col, hidden: s.hidden, pinned: s.pinned, align: s.align });
+      remaining.delete(s.id);
+    });
+
+    // Append any columns that weren't part of the saved snapshot
+    remaining.forEach(col => orderedColumns.push(col));
+
+    this.setState({
+      columns: orderedColumns,
+      columnWidths: { ...this.state.columnWidths, ...snapshot.columnWidths }
+    });
   }
 
   // --- ROW GROUPING ---

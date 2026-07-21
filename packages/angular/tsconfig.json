@@ -18,5 +18,7 @@
     "enableResourceInlining": true,
     "skipTemplateCodegen": true,
     "strictMetadataEmit": true
-  }
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.spec.ts"]
 }

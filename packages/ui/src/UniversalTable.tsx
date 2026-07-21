@@ -12,6 +12,8 @@ interface UniversalTableProps {
   density?: 'standard' | 'compact' | 'comfortable';
   showFilters?: boolean;
   showCheckboxes?: boolean; // ✅ NEW PROP
+  /** When provided, enables "Save Layout" / "Reset Layout" in the column context menu, persisting column order/width/pin/hidden/align to localStorage under this key. */
+  persistKey?: string;
 }
 
 interface ColumnWithRender {
@@ -36,17 +38,20 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
   enableStriped = false,
   density = 'standard',
   showFilters = false,
-  showCheckboxes = false // ✅ Default to false (Configurable)
+  showCheckboxes = false, // ✅ Default to false (Configurable)
+  persistKey
 }) => {
-  const internalHook = useUniversalTable(data, columns);
+  const internalHook = useUniversalTable(data, columns, { persistKey, reservedWidth: showCheckboxes ? 40 : 0 });
   const table = tableInstance || internalHook;
 
   const {
-    rows, state, visibleColumns, totalPages, selectedIds,
+    state, visibleColumns, totalPages, selectedIds,
     toggleSelection, toggleAllPage, isAllPageSelected,
     getHeaderProps, getResizerProps,
     setSortDirection, pinColumn, setColumnAlign,
     prevPage, nextPage, setPageSize, setFilter,
+    saveLayout, resetLayout,
+    containerRef, computedColumnWidths,
     // Virtualization
     virtualRows, virtualPaddingTop, virtualPaddingBottom, onScroll
   } = table;
@@ -64,18 +69,18 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
     visibleColumns.forEach((c: any) => {
       if (c.pinned === 'left') {
         offsets[c.id] = { ...offsets[c.id], left: currentLeft };
-        currentLeft += state.columnWidths[c.id] || c.width || 150;
+        currentLeft += computedColumnWidths[c.id] || c.width || 150;
       }
     });
 
     [...visibleColumns].reverse().forEach((c: any) => {
       if (c.pinned === 'right') {
         offsets[c.id] = { ...offsets[c.id], right: currentRight };
-        currentRight += state.columnWidths[c.id] || c.width || 150;
+        currentRight += computedColumnWidths[c.id] || c.width || 150;
       }
     });
     return offsets;
-  }, [visibleColumns, state.columnWidths, showCheckboxes]); // ✅ Depend on showCheckboxes
+  }, [visibleColumns, computedColumnWidths, showCheckboxes]);
 
   const getStickyStyle = (col: ColumnWithRender): CSSProperties => {
     if (!col.pinned) return {};
@@ -95,7 +100,7 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
   return (
     <div className="liji-grid-wrapper" style={{ height }}>
 
-      <div className="liji-table-scroll" onScroll={onScroll}>
+      <div className="liji-table-scroll" ref={containerRef as any} onScroll={onScroll}>
         <table className={`liji-table liji-${density} ${enableStriped ? 'liji-striped' : ''}`} role="table" aria-label="Data Table">
           <thead>
             {/* Header Row */}
@@ -112,7 +117,8 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
                 return (
                   <th key={col.id}
                     className={col.pinned ? `liji-pinned-${col.pinned}` : ''}
-                    style={{ width: state.columnWidths[col.id] || col.width, ...getStickyStyle(col) }}
+                    style={{ width: computedColumnWidths[col.id], ...getStickyStyle(col) }}
+                    data-col-id={col.id}
                     {...getHeaderProps(idx, col.id)}
                     role="columnheader"
                     scope="col"
@@ -157,7 +163,8 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
 
           {/* Body */}
           <tbody>
-            {rows.map((row: any) => {
+            {virtualPaddingTop > 0 && <tr style={{ height: virtualPaddingTop }}><td colSpan={visibleColumns.length + (showCheckboxes ? 1 : 0)} /></tr>}
+            {virtualRows.map((row: any) => {
               const isSelected = selectedIds.includes(row.id);
               return (
                 <tr key={row.id} className={isSelected ? 'liji-row-selected' : ''} aria-selected={isSelected} role="row">
@@ -217,6 +224,11 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
           <div className="liji-menu-item" onClick={() => { setColumnAlign(contextMenu.colId, 'left'); setContextMenu(null); }}>Align Left</div>
           <div className="liji-menu-item" onClick={() => { setColumnAlign(contextMenu.colId, 'center'); setContextMenu(null); }}>Align Center</div>
           <div className="liji-menu-item" onClick={() => { setColumnAlign(contextMenu.colId, 'right'); setContextMenu(null); }}>Align Right</div>
+          {persistKey && <>
+            <div className="liji-menu-divider" />
+            <div className="liji-menu-item" onClick={() => { saveLayout(); setContextMenu(null); }}>💾 Save Layout</div>
+            <div className="liji-menu-item" onClick={() => { resetLayout(); setContextMenu(null); }}>♻ Reset Layout</div>
+          </>}
         </div>
       )}
     </div>

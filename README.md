@@ -42,6 +42,8 @@ Liji Table uses a unique **headless-first architecture** that separates business
 - 📊 **Row Grouping** - Hierarchical data grouping with expand/collapse
 - 🚀 **Virtualization** - Built-in virtual scrolling for large datasets
 - 📤 **CSV Export** - Export filtered and sorted data
+- 💾 **Layout Persistence** - Save column order/width/pin/hidden/align to `localStorage` and restore it automatically next time
+- 📐 **Auto-Fit Column Widths** - Un-resized columns fill the container by default; resizing one column never shifts any other
 - ⚡ **Performance** - Optimized for large datasets with minimal re-renders
 - 🎯 **TypeScript** - Fully typed with comprehensive type definitions
 
@@ -49,10 +51,10 @@ Liji Table uses a unique **headless-first architecture** that separates business
 
 | Package | Version | Description |
 |---------|---------|-------------|
-| [`@liji-table/core`](./packages/core) | 0.0.2 | Framework-agnostic table engine |
-| [`@liji-table/react`](./packages/react) | 0.0.2 | React hooks for table management |
-| [`@liji-table/angular`](./packages/angular) | 0.0.3 | Angular components with RxJS |
-| [`@liji-table/ui`](./packages/ui) | - | Pre-built React UI components |
+| [`@liji-table/core`](./packages/core) | 0.0.8-beta.0 | Framework-agnostic table engine |
+| [`@liji-table/react`](./packages/react) | 0.0.8-beta.0 | React hooks for table management |
+| [`@liji-table/angular`](./packages/angular) | 0.0.8-beta.0 | Angular components with RxJS |
+| [`@liji-table/ui`](./packages/ui) | 0.0.8-beta.0 | Pre-built React UI components |
 
 ## 🚀 Quick Start
 
@@ -183,23 +185,19 @@ All packages are thoroughly tested with Vitest:
 npm test
 ```
 
-**Current Test Status**: ✅ All 13 core tests passing
+**Current Test Status**: ✅ All 34 tests passing across `core`, `react`, and `angular`
 
-## 🔄 Recent Updates (v0.0.2)
+## 🔄 Recent Updates (v0.0.8-beta.0)
 
 ### ✨ New Features
-- **Natural Sort Algorithm** - Strings with numbers now sort correctly (e.g., "Item 1", "Item 2", "Item 10")
-- **Auto-Reorder Pinned Columns** - Pinned columns automatically move to their correct positions
+- **Layout Persistence** - `saveLayout()` / `resetLayout()` / `hasSavedLayout()` on both the React hook and the Angular `UniversalTable` class, plus a `persistKey` option to auto-restore a saved column arrangement (order, width, pin, hidden, align) from `localStorage` on mount. The `@liji-table/ui` component and the Angular `<liji-table>` component both expose "💾 Save Layout" / "♻ Reset Layout" in the column context menu when `persistKey` is set.
+- **Deterministic Auto-Fit Column Widths** - new `computeAutoFitWidths()` in `@liji-table/core`. Columns you haven't manually resized proportionally fill the table's container by default; the moment you drag a resize handle, every other column is frozen at its current width so only the column you're dragging can change - no more sibling columns shifting mid-drag.
 
 ### 🐛 Bug Fixes
-- Fixed template literal syntax errors in core package
-- Removed duplicate template in Angular component
-- Improved TypeScript type safety
-
-### 🎯 Quality Improvements
-- All critical defects resolved
-- 100% test pass rate on core functionality
-- Enhanced code quality and maintainability
+- `@liji-table/ui`'s virtualization was a no-op (rendered every row regardless of scroll position) - now actually windows rows via `virtualRows`.
+- `@liji-table/ui` previously shipped raw, uncompiled `.tsx` source, which broke on bundlers that don't transform `node_modules` (e.g. default CRA/webpack setups). It now ships a real compiled `dist` build.
+- Fixed stale/mismatched compiled `.js` files that had been committed alongside `.ts`/`.tsx` sources in `core` and `ui`, which could cause module resolution to pick up out-of-date code.
+- Fixed several Angular `strict` type errors around grouped rows (`T | GroupRow<T>`).
 
 ## 🛠️ Development
 

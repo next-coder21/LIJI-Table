@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/bundlephobia/minzip/@liji-table/core" alt="bundle size"/>
 </p>
 
-> **Version 0.0.6** - Production Ready ✅
+> **Version 0.0.8-beta.0**
 
 A **framework-agnostic, high-performance table engine** that powers the LIJI-Table ecosystem.  
 It provides all advanced table logic — sorting, filtering, pagination, column resizing, selection, pinning, export, and state management — without depending on any UI framework.
@@ -22,27 +22,18 @@ It provides all advanced table logic — sorting, filtering, pagination, column 
 
 ---
 
-## 🔄 Recent Updates (v0.0.2)
+## 🔄 Recent Updates (v0.0.8-beta.0)
 
-### ✨ Enhancements
-- **Natural Sort Algorithm** - Implemented `Intl.Collator` for proper string sorting with numbers
-  - Now correctly sorts: "Item 1", "Item 2", "Item 10" (not "Item 1", "Item 10", "Item 2")
-  - Works for both regular sorting and grouped data
-- **Auto-Reorder Pinned Columns** - When pinning columns, they now automatically move to the correct position
-  - Left-pinned columns move to the start
-  - Right-pinned columns move to the end
-  - Unpinned columns return to the middle section
+### ✨ New Features
+- **Layout Persistence** - `getLayoutSnapshot()` captures the current column arrangement (order, hidden, pinned, align, widths) as a plain serializable object; `applyLayoutSnapshot(snapshot)` restores it, reordering/merging columns and leaving any columns not in the snapshot appended at the end. Framework packages (`react`, `angular`) build `localStorage` persistence on top of this.
+- **`computeAutoFitWidths(columns, columnWidths, containerWidth, reservedWidth?)`** - a pure, framework-agnostic function that computes the pixel width for every visible column: columns already present in `columnWidths` (i.e. manually resized) keep that exact value; any column not yet resized gets a proportional share of the remaining container width. This replaces relying on the browser's native `table-layout: fixed` leftover-redistribution, which used to spread any shortfall across *every* column on each reflow - including ones you'd just manually resized.
+- **`setColumnWidths(widths)`** - batch-set multiple column widths in a single state update/notify (used to "freeze" every column at the start of a resize drag).
 
 ### 🐛 Bug Fixes
-- Fixed template literal syntax errors in grouping and CSV export code
-- Corrected indentation in groupRow object definition
-- Improved code quality and maintainability
+- Removed stale, out-of-sync compiled `.js`/`.d.ts` files that had been committed to `src/` alongside the current `.ts` source - these could get picked up instead of the real source by bundlers/test runners.
 
 ### 🧪 Testing
-- ✅ All 13 core tests passing
-- ✅ Natural sort test coverage
-- ✅ Column pinning test coverage
-- ✅ Full feature regression testing
+- ✅ All core tests passing, including new coverage for `computeAutoFitWidths` and layout persistence
 
 ---
 

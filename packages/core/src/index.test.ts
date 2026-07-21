@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { LijiTable, TableColumn } from './index';
+import { LijiTable, TableColumn, computeAutoFitWidths } from './index';
 
 // Mock Canvas for autoResize
 if (typeof document === 'undefined') {
@@ -143,6 +143,50 @@ describe('LijiTable', () => {
             const cols = table.getState().columns;
             expect(cols[0].id).toBe('name');
             expect(cols[1].id).toBe('id');
+        });
+    });
+
+    describe('computeAutoFitWidths', () => {
+        const cols: TableColumn[] = [
+            { id: 'a', label: 'A', width: 100 },
+            { id: 'b', label: 'B', width: 100 },
+            { id: 'c', label: 'C', width: 200 },
+        ];
+
+        it('distributes full container width proportionally when nothing is manually sized', () => {
+            const widths = computeAutoFitWidths(cols, {}, 800, 0);
+            expect(widths.a + widths.b + widths.c).toBe(800);
+            // a and b have equal default width, so equal share
+            expect(widths.a).toBe(widths.b);
+            // c has 2x the default width of a, so ~2x the share
+            expect(widths.c).toBeGreaterThan(widths.a * 1.8);
+        });
+
+        it('never changes a manually-sized column, and only redistributes leftover among the rest', () => {
+            const widths = computeAutoFitWidths(cols, { b: 250 }, 800, 0);
+            expect(widths.b).toBe(250); // untouched
+            expect(widths.a + widths.b + widths.c).toBe(800);
+        });
+
+        it('respects reservedWidth (e.g. a checkbox column outside the column list)', () => {
+            const widths = computeAutoFitWidths(cols, {}, 800, 40);
+            expect(widths.a + widths.b + widths.c).toBe(760);
+        });
+
+        it('never shrinks a column below its minWidth even if the container is too small', () => {
+            const narrowCols: TableColumn[] = [
+                { id: 'a', label: 'A', width: 100, minWidth: 80 },
+                { id: 'b', label: 'B', width: 100, minWidth: 80 },
+            ];
+            const widths = computeAutoFitWidths(narrowCols, {}, 100, 0);
+            expect(widths.a).toBeGreaterThanOrEqual(80);
+            expect(widths.b).toBeGreaterThanOrEqual(80);
+        });
+
+        it('ignores hidden columns', () => {
+            const withHidden: TableColumn[] = [...cols, { id: 'd', label: 'D', width: 100, hidden: true }];
+            const widths = computeAutoFitWidths(withHidden, {}, 800, 0);
+            expect(widths.d).toBeUndefined();
         });
     });
 });

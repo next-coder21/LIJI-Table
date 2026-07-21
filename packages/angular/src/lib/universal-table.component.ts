@@ -1,4 +1,4 @@
-import { Component, Input, TemplateRef } from '@angular/core';
+import { Component, Input, TemplateRef, ElementRef, ViewChild, AfterViewInit, OnChanges, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { UniversalTable } from './universal-table';
 
@@ -8,8 +8,8 @@ import { UniversalTable } from './universal-table';
   imports: [CommonModule],
   template: `
     <div class="liji-grid-wrapper" [style.height]="height">
-      
-      <div class="liji-table-scroll" (scroll)="onScroll($event)">
+
+      <div class="liji-table-scroll" #scrollContainer (scroll)="onScroll($event)">
         <table class="liji-table" [ngClass]="'liji-' + density" [class.liji-striped]="enableStriped" role="table" aria-label="Data Table">
           <thead>
             <tr>
@@ -18,10 +18,11 @@ import { UniversalTable } from './universal-table';
               </th>
 
               <th *ngFor="let col of (table.visibleColumns$ | async); let i = index"
-                  [style.width.px]="(table.state$ | async)?.columnWidths?.[col.id] || col.width"
+                  [style.width.px]="(table.computedColumnWidths$ | async)?.[col.id]"
                   [ngClass]="col.pinned ? 'liji-pinned-' + col.pinned : ''"
                   [ngStyle]="table.getStickyStyle(col.id, showCheckboxes)"
-                  
+                  [attr.data-col-id]="col.id"
+
                   draggable="true"
                   (dragstart)="table.onDragStart($event, i)"
                   (dragover)="table.onDragOver($event)"
@@ -50,7 +51,7 @@ import { UniversalTable } from './universal-table';
                    [ngStyle]="getFilterStickyStyle(col.id)"
                    style="top:45px; z-index: 9"
                >
-                 <input class="liji-filter-input" placeholder="Filter..." 
+                 <input class="liji-filter-input" placeholder="Filter..."
                         (input)="onFilterChange(col.id, $event)">
                </th>
             </tr>
@@ -58,10 +59,10 @@ import { UniversalTable } from './universal-table';
 
           <tbody>
             <tr [style.height.px]="table.virtualPaddingTop"></tr>
-            <tr *ngFor="let row of table.virtualRows" [class.liji-row-selected]="table.selectedIds.includes(row.id)" [attr.aria-selected]="table.selectedIds.includes(row.id)" role="row">
-              
+            <tr *ngFor="let row of table.virtualRows" [class.liji-row-selected]="table.selectedIds.includes($any(row).id)" [attr.aria-selected]="table.selectedIds.includes($any(row).id)" role="row">
+
               <td *ngIf="showCheckboxes" class="liji-td-checkbox">
-                <input type="checkbox" [checked]="table.selectedIds.includes(row.id)" (change)="table.toggleSelection($any(row).id)">
+                <input type="checkbox" [checked]="table.selectedIds.includes($any(row).id)" (change)="table.toggleSelection($any(row).id)">
               </td>
 
               <td *ngFor="let col of (table.visibleColumns$ | async)"
@@ -70,9 +71,9 @@ import { UniversalTable } from './universal-table';
                   [ngStyle]="table.getStickyStyle(col.id, showCheckboxes)"
               >
                 <ng-container *ngIf="cellTemplates[col.id] as tpl; else defaultCell">
-                   <ng-container *ngTemplateOutlet="tpl; context: { $implicit: row[col.id], row: row }"></ng-container>
+                   <ng-container *ngTemplateOutlet="tpl; context: { $implicit: $any(row)[col.id], row: row }"></ng-container>
                 </ng-container>
-                <ng-template #defaultCell>{{ row[col.id] }}</ng-template>
+                <ng-template #defaultCell>{{ $any(row)[col.id] }}</ng-template>
               </td>
             </tr>
             <tr [style.height.px]="table.virtualPaddingBottom"></tr>
@@ -103,6 +104,11 @@ import { UniversalTable } from './universal-table';
           <div class="liji-menu-item" (click)="action('pinLeft')">Pin Left</div>
           <div class="liji-menu-item" (click)="action('pinRight')">Pin Right</div>
           <div class="liji-menu-item" (click)="action('unpin')">Unpin</div>
+          <ng-container *ngIf="table.persistEnabled">
+            <div class="liji-menu-divider"></div>
+            <div class="liji-menu-item" (click)="action('saveLayout')">💾 Save Layout</div>
+            <div class="liji-menu-item" (click)="action('resetLayout')">♻ Reset Layout</div>
+          </ng-container>
       </div>
       <div *ngIf="contextMenu" (click)="contextMenu = null" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:99;"></div>
 
@@ -110,7 +116,7 @@ import { UniversalTable } from './universal-table';
   `,
   styles: []
 })
-export class UniversalTableComponent {
+export class UniversalTableComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input() table!: UniversalTable<any>;
   @Input() height = '100%';
   @Input() enableStriped = false;
@@ -119,7 +125,29 @@ export class UniversalTableComponent {
   @Input() density: 'standard' | 'compact' | 'comfortable' = 'standard';
   @Input() cellTemplates: Record<string, TemplateRef<any>> = {};
 
+  @ViewChild('scrollContainer') scrollContainerRef!: ElementRef<HTMLElement>;
+  private resizeObserver?: ResizeObserver;
+
   contextMenu: { x: number, y: number, colId: string } | null = null;
+
+  ngOnChanges() {
+    // Keep the checkbox column's width reserved out of the auto-fit
+    // calculation for un-resized columns (see computeAutoFitWidths).
+    this.table?.setReservedWidth(this.showCheckboxes ? 40 : 0);
+  }
+
+  ngAfterViewInit() {
+    const node = this.scrollContainerRef?.nativeElement;
+    if (!node) return;
+    this.table.updateContainerWidth(node.clientWidth);
+    if (typeof ResizeObserver === 'undefined') return;
+    this.resizeObserver = new ResizeObserver(() => this.table.updateContainerWidth(node.clientWidth));
+    this.resizeObserver.observe(node);
+  }
+
+  ngOnDestroy() {
+    this.resizeObserver?.disconnect();
+  }
 
   onFilterChange(colId: string, event: Event) {
     this.table.setFilter(colId, (event.target as HTMLInputElement).value);
@@ -149,6 +177,8 @@ export class UniversalTableComponent {
     if (type === 'pinLeft') this.table.pinColumn(colId, 'left');
     if (type === 'pinRight') this.table.pinColumn(colId, 'right');
     if (type === 'unpin') this.table.pinColumn(colId, null);
+    if (type === 'saveLayout') this.table.saveLayout();
+    if (type === 'resetLayout') this.table.resetLayout();
 
     this.contextMenu = null;
   }

@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/bundlephobia/minzip/@liji-table/react" alt="bundle size"/>
 </p>
 
-> **Version 0.0.6** - Fully tested and production ready ✅
+> **Version 0.0.8-beta.0**
 
 A **headless, high-performance React table hook** built on top of `@liji-table/core`.  
 It provides all advanced table logic — sorting, filtering, pagination, resizing, selection, export, and pinning — while leaving **full UI control to the developer**.
@@ -22,13 +22,11 @@ It provides all advanced table logic — sorting, filtering, pagination, resizin
 
 ---
 
-## 🔄 What's New (v0.0.2)
+## 🔄 What's New (v0.0.8-beta.0)
 
-This version includes all improvements from `@liji-table/core` v0.0.2:
-- ✅ Natural sort algorithm for proper string/number sorting
-- ✅ Auto-reorder feature for pinned columns
-- ✅ Enhanced type safety and code quality
-- ✅ All tests passing
+- ✅ **Layout persistence** - pass `{ persistKey: 'my-table' }` as the third argument to `useLijiTable`/`useUniversalTable` and the column arrangement auto-restores from `localStorage` on mount. Call the returned `saveLayout()` to persist the current arrangement, `resetLayout()` to clear it and restore the original columns, `hasSavedLayout()` to check.
+- ✅ **Auto-fit column widths** - attach the returned `containerRef` to your scrolling wrapper and un-resized columns will proportionally fill it (`computedColumnWidths`). Resizing one column no longer shifts any other column.
+- ✅ All improvements from `@liji-table/core` v0.0.8-beta.0
 
 ---
 
@@ -94,6 +92,22 @@ The hook only provides **data + actions**.
 - Uses **direct DOM manipulation** during drag
 - React state updates only on mouse release
 - No re-render lag
+- Un-resized columns auto-fit the container by default (`computedColumnWidths`); resizing one column never shifts another
+
+---
+
+### 💾 Layout Persistence
+- `persistKey` option auto-restores a saved column arrangement from `localStorage` on mount
+- `saveLayout()` persists the current order/width/pin/hidden/align
+- `resetLayout()` clears the saved layout and restores the original columns
+- `hasSavedLayout()` checks whether a layout is currently saved
+
+```ts
+const table = useLijiTable(data, columns, { persistKey: 'users-table' });
+
+table.saveLayout();   // persist current arrangement
+table.resetLayout();  // clear it and restore defaults
+```
 
 ---
 
@@ -237,6 +251,11 @@ These helpers are designed to be attached directly to DOM elements.
 getHeaderProps(index, columnId)
 getResizerProps(columnId)
 isResizing
+containerRef          // attach to your scrolling wrapper for auto-fit widths
+computedColumnWidths  // { [columnId]: pixelWidth } - use this for th/td width, not state.columnWidths
+saveLayout()
+resetLayout()
+hasSavedLayout()
 ```
 ## ⚡ Performance Guarantees
 

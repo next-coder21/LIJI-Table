@@ -1,22 +1,23 @@
 {
   "name": "@liji-table/ui",
-  "version": "0.0.2",
+  "version": "0.0.8-beta.0",
   "type": "module",
-  "main": "src/index.js",
-  "types": "src/index.d.ts",
-  "style": "src/styles.css",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "style": "dist/styles.css",
   "license": "MIT",
+  "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
-    "build": "tsc" 
+    "build": "tsc && node -e \"require('fs').copyFileSync('src/styles.css','dist/styles.css')\""
   },
   "dependencies": {
     "@liji-table/core": "*",
     "react": "^18.0.0"
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./styles.css": "./src/styles.css",
-    "./UniversalTable": "./src/UniversalTable.tsx",
-    "./UniversalTableToolbar": "./src/UniversalTableToolbar.tsx"
+    ".": "./dist/index.js",
+    "./styles.css": "./dist/styles.css",
+    "./UniversalTable": "./dist/UniversalTable.js",
+    "./UniversalTableToolbar": "./dist/UniversalTableToolbar.js"
   }
 }

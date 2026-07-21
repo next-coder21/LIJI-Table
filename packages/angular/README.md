@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/bundlephobia/minzip/@liji-table/angular" alt="bundle size"/>
 </p>
 
-> **Version 0.0.6** - Fully tested and production ready ✅
+> **Version 0.0.8-beta.0**
 
 **Angular components and services** built on top of `@liji-table/core` with full RxJS integration.  
 Provides enterprise-ready data table functionality for Angular 18+ applications.
@@ -22,15 +22,15 @@ Provides enterprise-ready data table functionality for Angular 18+ applications.
 
 ---
 
-## 🔄 What's New (v0.0.3)
+## 🔄 What's New (v0.0.8-beta.0)
 
-### ✨ Improvements
-- ✅ Removed duplicate template definition (eliminated compiler warnings)
-- ✅ Enhanced type safety for density property (`'standard' | 'compact' | 'comfortable'`)
-- ✅ Includes all core improvements from `@liji-table/core` v0.0.2:
-  - Natural sort algorithm
-  - Auto-reorder for pinned columns
-  - Bug fixes and code quality improvements
+### ✨ New Features
+- **Layout persistence** - pass a `persistKey` as the 3rd constructor argument (`new UniversalTable(data, columns, 'users-table')`) and the column arrangement auto-restores from `localStorage` on mount. Call `table.saveLayout()` / `table.resetLayout()` / `table.hasSavedLayout()`. The `<liji-table>` component shows "💾 Save Layout" / "♻ Reset Layout" in its column context menu automatically when `persistEnabled` is true.
+- **Auto-fit column widths** - un-resized columns proportionally fill the table's container by default (`computedColumnWidths$` / `getComputedColumnWidths()`); resizing one column via drag no longer shifts any other column. The `<liji-table>` component wires up a `ResizeObserver` on the scroll container automatically.
+
+### 🐛 Bug Fixes
+- Fixed `rows` / `virtualRows` typing to correctly reflect `(T | GroupRow<T>)[]` instead of `T[]`, and made `isAllPageSelected()` filter out group rows before checking selection - eliminates several strict-mode TypeScript errors.
+- Scoped `tsconfig.json` to `src` so `tsc` no longer picks up unrelated type errors from `node_modules`.
 
 ---
 
@@ -208,6 +208,17 @@ this.table.toggleAllPage();
 
 // Export
 this.table.downloadCSV('users.csv');
+```
+
+### Layout Persistence
+
+```typescript
+// 3rd constructor arg enables auto-restore + save/reset from localStorage
+table = new UniversalTable(this.data, this.columns, 'users-table');
+
+this.table.saveLayout();       // persist current column order/width/pin/hidden/align
+this.table.resetLayout();      // clear saved layout, restore original columns
+this.table.hasSavedLayout();   // boolean
 ```
 
 ---

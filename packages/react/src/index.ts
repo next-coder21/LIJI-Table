@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import {
   LijiTable,
   TableState,
@@ -9,8 +9,54 @@ import {
   FilterOperator,
   FilterCondition,
   CellEditorType,
-  CellValidator
+  CellValidator,
+  LayoutSnapshot,
+  computeAutoFitWidths
 } from '@liji-table/core';
+
+const LAYOUT_STORAGE_PREFIX = 'liji-table:layout:';
+
+function loadLayoutFromStorage(key: string): LayoutSnapshot | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(LAYOUT_STORAGE_PREFIX + key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLayoutToStorage(key: string, snapshot: LayoutSnapshot) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(LAYOUT_STORAGE_PREFIX + key, JSON.stringify(snapshot));
+  } catch {
+    // localStorage unavailable (quota exceeded, private mode, etc.) - fail silently
+  }
+}
+
+function clearLayoutFromStorage(key: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(LAYOUT_STORAGE_PREFIX + key);
+  } catch {
+    // ignore
+  }
+}
+
+export interface UseLijiTableOptions {
+  /**
+   * When provided, the table's column layout (order, width, pin, hidden, align)
+   * is auto-restored from localStorage on mount under this key, and can be
+   * persisted at any time via the returned `saveLayout()` action.
+   */
+  persistKey?: string;
+  /**
+   * Width (px) to reserve when auto-fitting column widths to the container -
+   * e.g. a checkbox column rendered outside the column list. Default 0.
+   */
+  reservedWidth?: number;
+}
 
 /**
  * React hook for LijiTable
@@ -52,7 +98,8 @@ import {
  * );
  * ```
  */
-export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: TableColumn[] = []) {
+export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: TableColumn[] = [], options: UseLijiTableOptions = {}) {
+  const { persistKey, reservedWidth = 0 } = options;
 
   // 1. Stable References to prevent re-initialization loops
   const dataRef = useRef(data);
@@ -60,9 +107,15 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
 
 
 
-  // 2. Initialize Core (ONCE)
+  // 2. Initialize Core (ONCE), restoring a saved layout if one exists
   const table = useMemo(() => {
-    return new LijiTable(dataRef.current, columnsRef.current);
+    const instance = new LijiTable(dataRef.current, columnsRef.current);
+    if (persistKey) {
+      const savedLayout = loadLayoutFromStorage(persistKey);
+      if (savedLayout) instance.applyLayoutSnapshot(savedLayout);
+    }
+    return instance;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [state, setState] = useState<TableState>(table.getState());
@@ -79,9 +132,32 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
     return () => { unsubscribe(); }
   }, [table]);
 
-  // --- 5. RESIZE LOGIC (Headless & Performance Optimized) ---
-  const [isResizing, setIsResizing] = useState(false);
+  // --- 5. AUTO-FIT COLUMN WIDTHS ---
+  // Track the scroll container's width so columns the user hasn't manually
+  // resized can proportionally fill it by default (see computeAutoFitWidths
+  // in @liji-table/core). Consumers attach `containerRef` to the scrolling
+  // element that wraps the table.
+  const containerRef = useRef<HTMLElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
 
+  useLayoutEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+    const update = () => setContainerWidth(node.clientWidth);
+    update();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const computedColumnWidths = useMemo(
+    () => computeAutoFitWidths(state.columns, state.columnWidths, containerWidth, reservedWidth),
+    [state.columns, state.columnWidths, containerWidth, reservedWidth]
+  );
+
+  // --- 6. RESIZE LOGIC (Headless & Performance Optimized) ---
+  const [isResizing, setIsResizing] = useState(false);
 
   // We use direct DOM manipulation for the drag to avoid React render lag
   const getResizerProps = (colId: string) => ({
@@ -92,11 +168,32 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
       document.body.style.cursor = 'col-resize';
 
       const startX = e.pageX;
-      // Get current width from state, default to 150 if undefined
-      const startWidth = state.columnWidths[colId] || 150;
 
       // CRITICAL: Get the parent <TH> element to resize it directly
       const headerNode = (e.currentTarget as HTMLElement).closest('th');
+      if (!headerNode) return;
+
+      // 🧊 FREEZE: every column not yet in `columnWidths` is "auto" and
+      // proportionally fills the container by default (computedColumnWidths
+      // above). The instant a resize drag starts, commit every column's
+      // CURRENT computed width into `columnWidths` - converting them all to
+      // "manual" at their present size - so that only the column being
+      // dragged can change from here on. The table's total width simply
+      // grows/shrinks with it (the scroll wrapper handles overflow); no
+      // other column is ever recomputed as a side effect of this one drag.
+      const frozenWidths: Record<string, number> = {};
+      state.columns.forEach((c) => {
+        if (state.columnWidths[c.id] == null) {
+          frozenWidths[c.id] = computedColumnWidths[c.id];
+        }
+      });
+      if (Object.keys(frozenWidths).length > 0) {
+        table.setColumnWidths(frozenWidths);
+      }
+
+      // Start from the column's current computed width (not a stale
+      // default), so there's no jump the instant the drag begins.
+      const startWidth = computedColumnWidths[colId] ?? headerNode.getBoundingClientRect().width;
 
       const onMouseMove = (moveEvent: MouseEvent) => {
         if (!headerNode) return;
@@ -183,6 +280,11 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
       setContainerHeight(e.currentTarget.clientHeight);
     },
 
+    // Auto-fit column widths: attach `containerRef` to the scrolling element
+    // that wraps the table so un-resized columns can fill it by default.
+    containerRef,
+    computedColumnWidths,
+
     totalPages: table.getTotalPages(),
     selectedIds: state.selectedIds,
     allColumns: state.columns,
@@ -235,6 +337,22 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
     pinColumn: (colId: string, pin: 'left' | 'right' | null) => table.pinColumn(colId, pin),
     autoResizeAllColumns: () => table.autoResizeAllColumns(),
 
+    // --- LAYOUT PERSISTENCE ---
+    /** Persist the current column arrangement to localStorage (requires `persistKey`). */
+    saveLayout: () => {
+      if (!persistKey) {
+        console.warn('[Liji Table] saveLayout() requires a `persistKey` to be passed to useLijiTable().');
+        return;
+      }
+      saveLayoutToStorage(persistKey, table.getLayoutSnapshot());
+    },
+    /** Clear the saved layout and restore the original column arrangement. */
+    resetLayout: () => {
+      if (persistKey) clearLayoutFromStorage(persistKey);
+      table.setState({ columns: columnsRef.current, columnWidths: {} });
+    },
+    hasSavedLayout: () => !!persistKey && loadLayoutFromStorage(persistKey) !== null,
+
     // UI Helpers
     getHeaderProps,
     getResizerProps,
@@ -258,7 +376,7 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
  * const table = useLijiTable(data, columns);
  * ```
  */
-export function useUniversalTable<T extends { id: any }>(data: T[], initialColumns: TableColumn[] = []) {
+export function useUniversalTable<T extends { id: any }>(data: T[], initialColumns: TableColumn[] = [], options: UseLijiTableOptions = {}) {
   // Show deprecation warning only once
   useEffect(() => {
     if (typeof console !== 'undefined' && console.warn) {
@@ -270,5 +388,5 @@ export function useUniversalTable<T extends { id: any }>(data: T[], initialColum
     }
   }, []);
 
-  return useLijiTable(data, initialColumns);
+  return useLijiTable(data, initialColumns, options);
 }
