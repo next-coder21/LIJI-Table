@@ -1,4 +1,4 @@
-import { Component, Input, TemplateRef, ElementRef, ViewChild, AfterViewInit, OnChanges, OnDestroy } from '@angular/core';
+import { Component, Input, TemplateRef, ElementRef, ViewChild, ViewChildren, QueryList, AfterViewInit, OnChanges, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { UniversalTable } from './universal-table';
 
@@ -11,8 +11,9 @@ import { UniversalTable } from './universal-table';
 
       <div class="liji-table-scroll" #scrollContainer (scroll)="onScroll($event)">
         <table class="liji-table" [ngClass]="'liji-' + density" [class.liji-striped]="enableStriped" role="table" aria-label="Data Table">
-          <thead>
+          <thead #theadEl>
             <tr>
+              <th *ngIf="showRowPin" class="liji-th-row-pin"></th>
               <th *ngIf="showCheckboxes" class="liji-th-checkbox">
                 <input type="checkbox" [checked]="table.isAllPageSelected()" (change)="table.toggleAllPage()">
               </th>
@@ -45,6 +46,7 @@ import { UniversalTable } from './universal-table';
             </tr>
 
             <tr *ngIf="showFilters" class="liji-filter-row">
+               <th *ngIf="showRowPin" class="liji-th-row-pin" style="top:45px"></th>
                <th *ngIf="showCheckboxes" class="liji-th-checkbox" style="top:45px"></th>
                <th *ngFor="let col of (table.visibleColumns$ | async)"
                    [ngClass]="col.pinned ? 'liji-pinned-' + col.pinned : ''"
@@ -58,25 +60,23 @@ import { UniversalTable } from './universal-table';
           </thead>
 
           <tbody>
+            <!-- Pinned-top rows: sticky, stacked directly under the header.
+                 Always rendered regardless of scroll position - see table.pinnedTopRows. -->
+            <ng-container *ngFor="let row of table.pinnedTopRows; let i = index">
+              <ng-container *ngTemplateOutlet="rowTpl; context: { row: row, sticky: pinnedTopStyle(i) }"></ng-container>
+            </ng-container>
+
             <tr [style.height.px]="table.virtualPaddingTop"></tr>
-            <tr *ngFor="let row of table.virtualRows" [class.liji-row-selected]="table.selectedIds.includes($any(row).id)" [attr.aria-selected]="table.selectedIds.includes($any(row).id)" role="row">
-
-              <td *ngIf="showCheckboxes" class="liji-td-checkbox">
-                <input type="checkbox" [checked]="table.selectedIds.includes($any(row).id)" (change)="table.toggleSelection($any(row).id)">
-              </td>
-
-              <td *ngFor="let col of (table.visibleColumns$ | async)"
-                  [style.text-align]="col.align || 'left'"
-                  [ngClass]="col.pinned ? 'liji-pinned-' + col.pinned : ''"
-                  [ngStyle]="table.getStickyStyle(col.id, showCheckboxes)"
-              >
-                <ng-container *ngIf="cellTemplates[col.id] as tpl; else defaultCell">
-                   <ng-container *ngTemplateOutlet="tpl; context: { $implicit: $any(row)[col.id], row: row }"></ng-container>
-                </ng-container>
-                <ng-template #defaultCell>{{ $any(row)[col.id] }}</ng-template>
-              </td>
-            </tr>
+            <ng-container *ngFor="let row of table.virtualRows">
+              <ng-container *ngTemplateOutlet="rowTpl; context: { row: row, sticky: null }"></ng-container>
+            </ng-container>
             <tr [style.height.px]="table.virtualPaddingBottom"></tr>
+
+            <!-- Pinned-bottom rows: sticky to the bottom of .liji-table-scroll
+                 (the footer sits outside it, so bottom:0 doesn't collide). -->
+            <ng-container *ngFor="let row of table.pinnedBottomRows; let i = index">
+              <ng-container *ngTemplateOutlet="rowTpl; context: { row: row, sticky: pinnedBottomStyle(i) }"></ng-container>
+            </ng-container>
           </tbody>
         </table>
       </div>
@@ -113,6 +113,41 @@ import { UniversalTable } from './universal-table';
       <div *ngIf="contextMenu" (click)="contextMenu = null" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:99;"></div>
 
     </div>
+
+    <!-- Shared row markup for pinned-top / windowed / pinned-bottom rows. -->
+    <ng-template #rowTpl let-row="row" let-sticky="sticky">
+      <tr #rowEl
+          [style]="sticky"
+          [class.liji-row-selected]="table.selectedIds.includes($any(row).id)"
+          [class.liji-row-pinned]="table.isRowPinned($any(row).id)"
+          [attr.aria-selected]="table.selectedIds.includes($any(row).id)"
+          role="row">
+
+        <td *ngIf="showRowPin" class="liji-td-row-pin">
+          <button
+            type="button"
+            class="liji-row-pin-btn"
+            [class.liji-row-pin-btn-active]="table.isRowPinned($any(row).id)"
+            [attr.aria-label]="table.isRowPinned($any(row).id) ? 'Unpin row' : 'Pin row to top'"
+            (click)="table.pinRow($any(row).id, table.isRowPinned($any(row).id) ? null : 'top')"
+          >📌</button>
+        </td>
+        <td *ngIf="showCheckboxes" class="liji-td-checkbox">
+          <input type="checkbox" [checked]="table.selectedIds.includes($any(row).id)" (change)="table.toggleSelection($any(row).id)">
+        </td>
+
+        <td *ngFor="let col of (table.visibleColumns$ | async)"
+            [style.text-align]="col.align || 'left'"
+            [ngClass]="col.pinned ? 'liji-pinned-' + col.pinned : ''"
+            [ngStyle]="table.getStickyStyle(col.id, showCheckboxes)"
+        >
+          <ng-container *ngIf="cellTemplates[col.id] as tpl; else defaultCell">
+             <ng-container *ngTemplateOutlet="tpl; context: { $implicit: $any(row)[col.id], row: row }"></ng-container>
+          </ng-container>
+          <ng-template #defaultCell>{{ $any(row)[col.id] }}</ng-template>
+        </td>
+      </tr>
+    </ng-template>
   `,
   styles: []
 })
@@ -122,31 +157,76 @@ export class UniversalTableComponent implements AfterViewInit, OnChanges, OnDest
   @Input() enableStriped = false;
   @Input() showCheckboxes = false;
   @Input() showFilters = false;
+  /** Shows a per-row 📌 button that pins the row to the top (renders on every page). */
+  @Input() showRowPin = false;
   @Input() density: 'standard' | 'compact' | 'comfortable' = 'standard';
   @Input() cellTemplates: Record<string, TemplateRef<any>> = {};
 
   @ViewChild('scrollContainer') scrollContainerRef!: ElementRef<HTMLElement>;
-  private resizeObserver?: ResizeObserver;
+  @ViewChild('theadEl') theadElRef!: ElementRef<HTMLTableSectionElement>;
+  @ViewChildren('rowEl') rowEls!: QueryList<ElementRef<HTMLTableRowElement>>;
+
+  private containerResizeObserver?: ResizeObserver;
+  private headerResizeObserver?: ResizeObserver;
+  private rowResizeObserver?: ResizeObserver;
+
+  // Sticky row offsets: pinned rows need a *measured* header height and row
+  // height (both vary with `density`/`showFilters`), not a guessed pixel
+  // value, so they stack under the header and against each other without
+  // gaps or overlap.
+  headerHeight = 0;
+  rowHeight = 41;
 
   contextMenu: { x: number, y: number, colId: string } | null = null;
 
   ngOnChanges() {
     // Keep the checkbox column's width reserved out of the auto-fit
     // calculation for un-resized columns (see computeAutoFitWidths).
-    this.table?.setReservedWidth(this.showCheckboxes ? 40 : 0);
+    this.table?.setReservedWidth((this.showCheckboxes ? 40 : 0) + (this.showRowPin ? 32 : 0));
   }
 
   ngAfterViewInit() {
     const node = this.scrollContainerRef?.nativeElement;
-    if (!node) return;
-    this.table.updateContainerWidth(node.clientWidth);
-    if (typeof ResizeObserver === 'undefined') return;
-    this.resizeObserver = new ResizeObserver(() => this.table.updateContainerWidth(node.clientWidth));
-    this.resizeObserver.observe(node);
+    if (node && typeof ResizeObserver !== 'undefined') {
+      this.table.updateContainerWidth(node.clientWidth);
+      this.containerResizeObserver = new ResizeObserver(() => this.table.updateContainerWidth(node.clientWidth));
+      this.containerResizeObserver.observe(node);
+    }
+
+    const theadEl = this.theadElRef?.nativeElement;
+    if (theadEl && typeof ResizeObserver !== 'undefined') {
+      this.headerHeight = theadEl.offsetHeight;
+      this.headerResizeObserver = new ResizeObserver(() => { this.headerHeight = theadEl.offsetHeight; });
+      this.headerResizeObserver.observe(theadEl);
+    }
+
+    this.observeFirstRow();
+    this.rowEls.changes.subscribe(() => this.observeFirstRow());
+  }
+
+  /** Re-measures row height off whichever row renders first (pinned or windowed) - re-run whenever the rendered row set changes. */
+  private observeFirstRow() {
+    this.rowResizeObserver?.disconnect();
+    const rowEl = this.rowEls.first?.nativeElement;
+    if (!rowEl || typeof ResizeObserver === 'undefined') return;
+    this.rowHeight = rowEl.offsetHeight;
+    this.rowResizeObserver = new ResizeObserver(() => { this.rowHeight = rowEl.offsetHeight; });
+    this.rowResizeObserver.observe(rowEl);
+  }
+
+  pinnedTopStyle(index: number) {
+    return { position: 'sticky', top: `${this.headerHeight + index * this.rowHeight}px`, zIndex: 5 };
+  }
+
+  pinnedBottomStyle(index: number) {
+    const fromEnd = this.table.pinnedBottomRows.length - 1 - index;
+    return { position: 'sticky', bottom: `${fromEnd * this.rowHeight}px`, zIndex: 5 };
   }
 
   ngOnDestroy() {
-    this.resizeObserver?.disconnect();
+    this.containerResizeObserver?.disconnect();
+    this.headerResizeObserver?.disconnect();
+    this.rowResizeObserver?.disconnect();
   }
 
   onFilterChange(colId: string, event: Event) {

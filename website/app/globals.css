@@ -1,0 +1,199 @@
+@import "tailwindcss";
+
+@custom-variant light (&:where(.light, .light *));
+
+/* Default = dark. Deep-space void is the brand's real identity now; .light
+   is the "daylight observatory" opt-out. Accent = telemetry signal cyan,
+   accent-2 = nebula violet, accent-amber = caution-beacon amber. */
+:root {
+  --paper: #05060d;
+  --paper-raised: #0b0f1c;
+  --paper-raised-2: #121a2e;
+  --ink: #eef1f8;
+  --ink-muted: #8b93a7;
+  --ink-faint: #565f77;
+  --grid-line: #1b2138;
+  --grid-line-strong: #2a3358;
+
+  --accent: #4fd6ff;
+  --accent-ink: #05060d;
+  --accent-2: #b26bff;
+  --accent-amber: #f2a93b;
+  --accent-amber-ink: #241804;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+}
+
+.light {
+  --paper: #f6f7f9;
+  --paper-raised: #ffffff;
+  --paper-raised-2: #eef0f3;
+  --ink: #0b1220;
+  --ink-muted: #5b6472;
+  --ink-faint: #8892a0;
+  --grid-line: #dee3ea;
+  --grid-line-strong: #c3cad5;
+
+  --accent: #0891b2;
+  --accent-ink: #ffffff;
+  --accent-2: #7c3aed;
+  --accent-amber: #f2a93b;
+  --accent-amber-ink: #2a1c02;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-paper-raised-2: var(--paper-raised-2);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-grid-line: var(--grid-line);
+  --color-grid-line-strong: var(--grid-line-strong);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-2: var(--accent-2);
+  --color-accent-amber: var(--accent-amber);
+  --color-accent-amber-ink: var(--accent-amber-ink);
+
+  --font-display: var(--font-plex-mono);
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html {
+  color-scheme: dark;
+}
+html.light {
+  color-scheme: light;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--ink);
+}
+
+/* Visible keyboard focus, everywhere */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* --- Macro: page-load reveal --- */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Macro: scroll-triggered reveal (see components/Reveal.tsx) --- */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* --- Micro: one-shot boot glow on the wordmark icon --- */
+@keyframes bootGlow {
+  0% {
+    filter: drop-shadow(0 0 0 transparent);
+  }
+  35% {
+    filter: drop-shadow(0 0 14px color-mix(in srgb, var(--accent) 70%, transparent));
+  }
+  100% {
+    filter: drop-shadow(0 0 0 transparent);
+  }
+}
+
+/* --- Micro: gradient sweep across a top border --- */
+@keyframes sweep {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+.sweep-line {
+  height: 2px;
+  background-image: linear-gradient(90deg, transparent, var(--accent), var(--accent-2), transparent);
+  background-size: 200% 100%;
+  animation: sweep 3.2s linear infinite;
+}
+
+/* --- Micro: ambient breathing glow --- */
+@keyframes breathe {
+  0%, 100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* --- Micro: star twinkle (ambient starfield, all sections) --- */
+@keyframes twinkle {
+  0%, 100% {
+    opacity: var(--twinkle-min, 0.15);
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: var(--twinkle-max, 0.9);
+    transform: scale(1);
+  }
+}
+.star {
+  animation: twinkle var(--twinkle-duration, 4s) ease-in-out infinite;
+  animation-delay: var(--twinkle-delay, 0s);
+}
+@media (prefers-reduced-motion: reduce) {
+  .star {
+    animation: none;
+    opacity: 0.5;
+  }
+}

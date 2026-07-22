@@ -52,6 +52,13 @@ export interface UseLijiTableOptions {
    */
   persistKey?: string;
   /**
+   * When `true` (requires `persistKey`), automatically calls `saveLayout()`
+   * whenever the column layout (order/pinned/hidden/width/align) changes,
+   * instead of requiring the consumer to call `saveLayout()` themselves.
+   * Default `false`.
+   */
+  autoPersist?: boolean;
+  /**
    * Width (px) to reserve when auto-fitting column widths to the container -
    * e.g. a checkbox column rendered outside the column list. Default 0.
    */
@@ -99,7 +106,7 @@ export interface UseLijiTableOptions {
  * ```
  */
 export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: TableColumn[] = [], options: UseLijiTableOptions = {}) {
-  const { persistKey, reservedWidth = 0 } = options;
+  const { persistKey, autoPersist = false, reservedWidth = 0 } = options;
 
   // 1. Stable References to prevent re-initialization loops
   const dataRef = useRef(data);
@@ -132,6 +139,23 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
     return () => { unsubscribe(); }
   }, [table]);
 
+  // 4b. AUTO-PERSIST: when enabled, save the layout whenever it changes
+  // (order/pinned/hidden/width/align), skipping the initial mount so we
+  // don't immediately re-save the layout we just restored.
+  const layoutSignature = useMemo(
+    () => JSON.stringify(state.columns.map(c => ({ id: c.id, pinned: c.pinned, hidden: c.hidden, align: c.align, width: state.columnWidths[c.id] }))),
+    [state.columns, state.columnWidths]
+  );
+  const skipFirstPersist = useRef(true);
+  useEffect(() => {
+    if (!autoPersist || !persistKey) return;
+    if (skipFirstPersist.current) {
+      skipFirstPersist.current = false;
+      return;
+    }
+    saveLayoutToStorage(persistKey, table.getLayoutSnapshot());
+  }, [layoutSignature, autoPersist, persistKey, table]);
+
   // --- 5. AUTO-FIT COLUMN WIDTHS ---
   // Track the scroll container's width so columns the user hasn't manually
   // resized can proportionally fill it by default (see computeAutoFitWidths
@@ -161,6 +185,15 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
 
   // We use direct DOM manipulation for the drag to avoid React render lag
   const getResizerProps = (colId: string) => ({
+    // Consumers commonly render this handle inside a `getHeaderProps` <th>
+    // (draggable: true, for column reordering). Without these guards, a
+    // mousedown/drag started on the resizer can be picked up by the
+    // ancestor's native HTML5 drag instead of triggering a resize.
+    draggable: false,
+    onDragStart: (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    },
     onMouseDown: (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
@@ -255,13 +288,28 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
 
   // Derived Virtual State
   const allRows = table.getRows();
-  const totalVirtualHeight = allRows.length * rowHeight;
+
+  // Pinned rows must never be excluded by the scroll-position window below -
+  // they're meant to always be rendered (as sticky rows; see getResizerProps
+  // -style helpers in the UI/Angular renderers) regardless of how far the
+  // scrollable middle has scrolled. `virtualRows` covers only that
+  // scrollable middle; consumers render pinnedTopRows/pinnedBottomRows
+  // separately, outside the windowing below. When nothing is pinned these
+  // are empty arrays and `virtualRows` behaves exactly as before.
+  const { top: pinnedTopRows, bottom: pinnedBottomRows } = table.getPinnedRows();
+  const pinnedTopIds = new Set(pinnedTopRows.map((r: any) => r.id));
+  const pinnedBottomIds = new Set(pinnedBottomRows.map((r: any) => r.id));
+  const scrollableRows = pinnedTopIds.size === 0 && pinnedBottomIds.size === 0
+    ? allRows
+    : allRows.filter((r: any) => !pinnedTopIds.has(r.id) && !pinnedBottomIds.has(r.id));
+
+  const totalVirtualHeight = scrollableRows.length * rowHeight;
 
   // Buffer: render 5 extra rows above and below
   const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - 5);
-  const endIndex = Math.min(allRows.length, Math.ceil((scrollTop + containerHeight) / rowHeight) + 5);
+  const endIndex = Math.min(scrollableRows.length, Math.ceil((scrollTop + containerHeight) / rowHeight) + 5);
 
-  const virtualRows = allRows.slice(startIndex, endIndex);
+  const virtualRows = scrollableRows.slice(startIndex, endIndex);
   const virtualPaddingTop = startIndex * rowHeight;
   const virtualPaddingBottom = totalVirtualHeight - (endIndex * rowHeight);
 
@@ -269,7 +317,11 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
   return {
     state,
     rows: allRows, // Legacy support
-    virtualRows, // New Virtual Rows
+    virtualRows, // Scrollable/windowed rows - excludes pinned rows, see above
+    /** Rows pinned 'top', always rendered - render with sticky positioning outside the virtualized window. */
+    pinnedTopRows,
+    /** Rows pinned 'bottom', always rendered - render with sticky positioning outside the virtualized window. */
+    pinnedBottomRows,
     virtualPaddingTop,
     virtualPaddingBottom,
     totalVirtualHeight,
@@ -331,11 +383,20 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
       return leafRows.length > 0 && leafRows.every(r => state.selectedIds.includes(r.id));
     },
 
+    /** Pin a row to 'top' / 'bottom' (renders on every page), or unpin with `null`. */
+    pinRow: (id: string | number, pin: 'top' | 'bottom' | null) => table.pinRow(id, pin),
+    isRowPinned: (id: string | number) => table.isRowPinned(id),
+
     setColumnAlign: (colId: string, align: ColumnAlign) => table.setColumnAlign(colId, align),
 
     // --- NEW EXPORTS (Required for UI) ---
-    pinColumn: (colId: string, pin: 'left' | 'right' | null) => table.pinColumn(colId, pin),
+    pinColumn: (colId: string, pin: 'left' | 'right' | null, options?: { reorder?: boolean }) =>
+      table.pinColumn(colId, pin, options),
     autoResizeAllColumns: () => table.autoResizeAllColumns(),
+    /** Set a single column's width (px). Participates in `saveLayout()` persistence. */
+    setColumnWidth: (colId: string, width: number) => table.setColumnWidth(colId, width),
+    /** Batch-set multiple column widths in one update. Participates in `saveLayout()` persistence. */
+    setColumnWidths: (widths: Record<string, number>) => table.setColumnWidths(widths),
 
     // --- LAYOUT PERSISTENCE ---
     /** Persist the current column arrangement to localStorage (requires `persistKey`). */

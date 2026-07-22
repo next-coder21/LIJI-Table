@@ -325,3 +325,55 @@ th.liji-drag-over {
   margin: 0;
   transform: translateY(2px); /* Slight visual alignment */
 }
+
+.liji-th-row-pin,
+.liji-td-row-pin {
+  width: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
+  padding: 0 !important;
+  text-align: center;
+  position: sticky !important;
+  left: 0;
+  z-index: 1;
+  background: var(--liji-white);
+  border-right: 1px solid var(--liji-border);
+}
+
+.liji-th-row-pin {
+  z-index: 30;
+  background: #fcfcfd;
+}
+
+/* When both the row-pin and checkbox columns are shown, the checkbox
+   column sits after the row-pin column, so its sticky offset shifts over. */
+.liji-th-row-pin ~ .liji-th-checkbox,
+.liji-td-row-pin ~ .liji-td-checkbox {
+  left: 32px;
+}
+
+.liji-row-pin-btn {
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  padding: 2px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.35;
+  filter: grayscale(1);
+  transition: opacity 0.15s, filter 0.15s;
+}
+
+.liji-row-pin-btn:hover {
+  opacity: 0.75;
+}
+
+.liji-row-pin-btn-active {
+  opacity: 1;
+  filter: none;
+}
+
+.liji-row-pinned {
+  background: rgba(59, 130, 246, 0.04);
+}

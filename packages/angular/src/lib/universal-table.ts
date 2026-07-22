@@ -134,11 +134,27 @@ export class UniversalTable<T extends { id: any }> {
   private containerHeight = 800;
   private rowHeight = 48;
 
-  get virtualRows(): (T | GroupRow<T>)[] {
+  // Pinned rows must never be excluded by the scroll-position window below -
+  // they're always rendered (as sticky rows, see the component template)
+  // regardless of how far the scrollable middle has scrolled. `virtualRows`
+  // covers only that scrollable middle; `pinnedTopRows`/`pinnedBottomRows`
+  // are rendered separately, outside the windowing below.
+  get pinnedTopRows(): T[] { return this.core.getPinnedRows().top; }
+  get pinnedBottomRows(): T[] { return this.core.getPinnedRows().bottom; }
+
+  private getScrollableRows(): (T | GroupRow<T>)[] {
     const allRows = this.core.getRows();
+    const { top, bottom } = this.core.getPinnedRows();
+    if (top.length === 0 && bottom.length === 0) return allRows;
+    const pinnedIds = new Set([...top, ...bottom].map(r => r.id));
+    return allRows.filter(r => !pinnedIds.has((r as any).id));
+  }
+
+  get virtualRows(): (T | GroupRow<T>)[] {
+    const scrollableRows = this.getScrollableRows();
     const startIndex = Math.max(0, Math.floor(this.scrollTop / this.rowHeight) - 5);
-    const endIndex = Math.min(allRows.length, Math.ceil((this.scrollTop + this.containerHeight) / this.rowHeight) + 5);
-    return allRows.slice(startIndex, endIndex);
+    const endIndex = Math.min(scrollableRows.length, Math.ceil((this.scrollTop + this.containerHeight) / this.rowHeight) + 5);
+    return scrollableRows.slice(startIndex, endIndex);
   }
 
   get virtualPaddingTop(): number {
@@ -147,9 +163,9 @@ export class UniversalTable<T extends { id: any }> {
   }
 
   get virtualPaddingBottom(): number {
-    const allRows = this.core.getRows();
-    const totalHeight = allRows.length * this.rowHeight;
-    const endIndex = Math.min(allRows.length, Math.ceil((this.scrollTop + this.containerHeight) / this.rowHeight) + 5);
+    const scrollableRows = this.getScrollableRows();
+    const totalHeight = scrollableRows.length * this.rowHeight;
+    const endIndex = Math.min(scrollableRows.length, Math.ceil((this.scrollTop + this.containerHeight) / this.rowHeight) + 5);
     return Math.max(0, totalHeight - (endIndex * this.rowHeight));
   }
 
@@ -191,6 +207,11 @@ export class UniversalTable<T extends { id: any }> {
     const rows = this.core.getRows().filter((r): r is T => !(r as any).isGroup); // only leaf rows are selectable
     return rows.length > 0 && rows.every(r => this.stateSubject.value.selectedIds.includes(r.id));
   }
+
+  // Row Pinning
+  /** Pin a row to 'top' / 'bottom' (renders on every page), or unpin with `null`. */
+  pinRow(id: string | number, pin: 'top' | 'bottom' | null) { this.core.pinRow(id, pin); }
+  isRowPinned(id: string | number) { return this.core.isRowPinned(id); }
 
   // Columns
   toggleVisibility(colId: string) { this.core.toggleVisibility(colId); }

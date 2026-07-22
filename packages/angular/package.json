@@ -2,8 +2,10 @@
   "name": "@liji-table/angular",
   "version": "0.0.8-beta.0",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/fesm2022/liji-table-angular.mjs",
+  "module": "dist/fesm2022/liji-table-angular.mjs",
   "types": "dist/index.d.ts",
+  "sideEffects": false,
   "scripts": {
     "build": "ng-packagr -p ng-package.json"
   },

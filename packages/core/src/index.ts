@@ -94,6 +94,7 @@ export function computeAutoFitWidths(
   reservedWidth: number = 0
 ): Record<string, number> {
   const visible = columns.filter(c => !c.hidden);
+  const hidden = columns.filter(c => c.hidden);
   const result: Record<string, number> = {};
   const autoCols: TableColumn[] = [];
   let manualSum = 0;
@@ -106,6 +107,13 @@ export function computeAutoFitWidths(
     } else {
       autoCols.push(c);
     }
+  });
+
+  // Hidden columns don't participate in the fill calculation, but every
+  // column still gets an entry so `computedColumnWidths[colId]` is never
+  // `undefined` regardless of a column's hidden/visible state.
+  hidden.forEach(c => {
+    result[c.id] = columnWidths[c.id] ?? (c.width || 150);
   });
 
   if (autoCols.length === 0) return result;
@@ -146,6 +154,15 @@ export interface TableState {
 
   selectedIds: (string | number)[];
 
+  /**
+   * Row pinning (v0.0.9+): rows pinned "top" always render before the
+   * current page's rows, "bottom" always after - regardless of sort order
+   * or which page you're on. A pinned row that no longer matches the
+   * current filter/search is omitted, same as any other row. Ignored while
+   * `grouping` is active.
+   */
+  pinnedRowIds: { top: (string | number)[]; bottom: (string | number)[] };
+
   // Row Grouping State
   grouping: string[]; // Column IDs to group by
   expandedGroupIds: string[]; // Keys of expanded groups
@@ -165,6 +182,15 @@ export interface GroupRow<T> {
   expanded: boolean;
   rowId: string; // Synthetic ID for selection/rendering compatibility
   leafCount: number; // Total children count
+}
+
+/**
+ * Type guard for narrowing a `T | GroupRow<T>` union (returned by `rows` /
+ * `visibleColumns` when grouping is enabled) down to the group-row case.
+ * Equivalent to checking `row.isGroup`, but usable directly as a type guard.
+ */
+export function isGroupRow<T>(row: T | GroupRow<T>): row is GroupRow<T> {
+  return (row as any)?.isGroup === true;
 }
 
 /**
@@ -206,6 +232,7 @@ export class LijiTable<T extends { id: any }> {
       globalSearch: '',
       advancedFilters: {}, // Advanced filters (empty = no filter)
       selectedIds: [],
+      pinnedRowIds: { top: [], bottom: [] },
       grouping: [],
       expandedGroupIds: [],
       editingCell: null,
@@ -556,6 +583,21 @@ export class LijiTable<T extends { id: any }> {
     }
   }
 
+  /** Pin a row to 'top' / 'bottom' (always renders on every page), or unpin with `null`. */
+  pinRow(id: string | number, pin: 'top' | 'bottom' | null) {
+    const top = this.state.pinnedRowIds.top.filter(x => x !== id);
+    const bottom = this.state.pinnedRowIds.bottom.filter(x => x !== id);
+    if (pin === 'top') top.push(id);
+    else if (pin === 'bottom') bottom.push(id);
+    this.setState({ pinnedRowIds: { top, bottom } });
+  }
+
+  isRowPinned(id: string | number): 'top' | 'bottom' | null {
+    if (this.state.pinnedRowIds.top.includes(id)) return 'top';
+    if (this.state.pinnedRowIds.bottom.includes(id)) return 'bottom';
+    return null;
+  }
+
   setColumnWidth(colId: string, width: number) {
     this.setState({
       columnWidths: { ...this.state.columnWidths, [colId]: width }
@@ -596,7 +638,23 @@ export class LijiTable<T extends { id: any }> {
     this.setState({ columns });
   }
 
-  pinColumn(colId: string, pin: 'left' | 'right' | null) {
+  /**
+   * @param options.reorder When `false`, only the `pinned` flag changes -
+   *   the column stays at its current index instead of snapping to the
+   *   left/right edge (or back to where auto-reorder would place it on
+   *   unpin). Useful for a "reset width, keep position" action that
+   *   shouldn't move the column. Defaults to `true` (existing behavior).
+   */
+  pinColumn(colId: string, pin: 'left' | 'right' | null, options: { reorder?: boolean } = {}) {
+    const { reorder = true } = options;
+
+    if (!reorder) {
+      this.setState({
+        columns: this.state.columns.map(c => c.id === colId ? { ...c, pinned: pin } : c)
+      });
+      return;
+    }
+
     let columns = this.state.columns.map(c =>
       c.id === colId ? { ...c, pinned: pin } : c
     );
@@ -626,6 +684,15 @@ export class LijiTable<T extends { id: any }> {
     this.setState({ columns });
   }
 
+  /**
+   * Fit-to-**content**: sets every visible column's width from a character-length
+   * heuristic over its label and (a sample of) its cell values, clamped to
+   * 50-300px. This is unrelated to `computeAutoFitWidths` (used automatically by
+   * the React hook's `computedColumnWidths` to fill the container for columns
+   * that haven't been resized) - that one is fit-to-**container**, this one is
+   * fit-to-**content**. If the container is much wider than 300px per column,
+   * calling this will visibly shrink columns and leave empty space, not fill it.
+   */
   autoResizeAllColumns() {
     // Basic heuristic: average char width * max length
     // In a real app, this would use canvas measurement or DOM measurement
@@ -711,7 +778,38 @@ export class LijiTable<T extends { id: any }> {
 
   // --- QUERY PIPELINE ---
 
+  // Memoizes the filtered+sorted (or grouped) row computation: `getRows()`,
+  // `getTotalPages()`, and `getPinnedRows()` all call `getAllFilteredRows()`
+  // internally, and the same computation is re-requested many times per
+  // scroll/render cycle without the underlying data or query state having
+  // changed. Re-filtering and re-sorting the full dataset on every one of
+  // those calls is the actual bottleneck at large row counts (millions of
+  // rows) - not row pinning itself. The cache key covers every input the
+  // computation reads; a stale `this.data` reference (set via `setData()`)
+  // or any query-state change invalidates it automatically.
+  private filteredRowsCache: { dataRef: T[]; key: string; rows: (T | GroupRow<T>)[] } | null = null;
+
+  private getFilterCacheKey(): string {
+    const s = this.state;
+    return JSON.stringify([
+      s.globalSearch, s.filters, s.advancedFilters,
+      s.grouping, s.expandedGroupIds,
+      s.sortColumns, s.sortColumn, s.sortDirection,
+    ]);
+  }
+
   getAllFilteredRows(): (T | GroupRow<T>)[] {
+    const key = this.getFilterCacheKey();
+    const cached = this.filteredRowsCache;
+    if (cached && cached.dataRef === this.data && cached.key === key) {
+      return cached.rows;
+    }
+    const rows = this.computeFilteredRows();
+    this.filteredRowsCache = { dataRef: this.data, key, rows };
+    return rows;
+  }
+
+  private computeFilteredRows(): (T | GroupRow<T>)[] {
     let rows: (T | GroupRow<T>)[] = this.data;
 
     // 1. Global Search
@@ -842,15 +940,52 @@ export class LijiTable<T extends { id: any }> {
     return result;
   }
 
+  /**
+   * Splits filtered rows into pinned-top / unpinned / pinned-bottom.
+   * Pinned rows are looked up from the already-filtered set, so a pinned
+   * row that no longer matches the current filter/search is simply
+   * omitted, like any other row. No-op (returns everything as "unpinned")
+   * while grouping is active, or if nothing is pinned.
+   */
+  private splitPinnedRows(rows: (T | GroupRow<T>)[]): { top: T[]; unpinned: (T | GroupRow<T>)[]; bottom: T[] } {
+    const { top: topIds, bottom: bottomIds } = this.state.pinnedRowIds;
+    if (this.state.grouping.length > 0 || (topIds.length === 0 && bottomIds.length === 0)) {
+      return { top: [], unpinned: rows, bottom: [] };
+    }
+    const flat = rows as T[];
+    const topSet = new Set(topIds);
+    const bottomSet = new Set(bottomIds);
+    const byId = new Map(flat.map(r => [r.id, r]));
+    const top = topIds.map(id => byId.get(id)).filter((r): r is T => r != null);
+    const bottom = bottomIds.map(id => byId.get(id)).filter((r): r is T => r != null);
+    const unpinned = flat.filter(r => !topSet.has(r.id) && !bottomSet.has(r.id));
+    return { top, unpinned, bottom };
+  }
+
   getRows(): (T | GroupRow<T>)[] {
     const allFiltered = this.getAllFilteredRows();
     const { pageIndex, pageSize } = this.state;
+    const { top, unpinned, bottom } = this.splitPinnedRows(allFiltered);
     const start = pageIndex * pageSize;
-    return allFiltered.slice(start, start + pageSize);
+    const page = unpinned.slice(start, start + pageSize);
+    return top.length === 0 && bottom.length === 0 ? page : [...top, ...page, ...bottom];
   }
 
   getTotalPages() {
-    return Math.ceil(this.getAllFilteredRows().length / this.state.pageSize);
+    const { unpinned } = this.splitPinnedRows(this.getAllFilteredRows());
+    return Math.ceil(unpinned.length / this.state.pageSize);
+  }
+
+  /**
+   * Pinned rows resolved against the current filtered set, in pin order.
+   * Lets a renderer render them as permanently-visible sticky rows outside
+   * of its normal scroll/virtualization windowing, instead of re-deriving
+   * "which rows are pinned" from `getRows()`'s output by id. Empty while
+   * grouping is active, same as `pinRow()` itself is a no-op there.
+   */
+  getPinnedRows(): { top: T[]; bottom: T[] } {
+    const { top, bottom } = this.splitPinnedRows(this.getAllFilteredRows());
+    return { top, bottom };
   }
 
   getCSVContent() {

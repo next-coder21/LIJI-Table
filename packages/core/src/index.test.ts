@@ -129,6 +129,103 @@ describe('LijiTable', () => {
         });
     });
 
+    describe('Row Pinning', () => {
+        it('pins a row to the top, ahead of sort order', () => {
+            table.pinRow(4, 'top'); // David (age 35)
+            table.setSortDirection('age', 'asc'); // would otherwise put David last
+            const rows = table.getRows();
+            expect(rows[0].id).toBe(4);
+            expect(table.isRowPinned(4)).toBe('top');
+        });
+
+        it('pins a row to the bottom', () => {
+            table.pinRow(1, 'bottom'); // Alice
+            const rows = table.getRows();
+            expect(rows[rows.length - 1].id).toBe(1);
+            expect(table.isRowPinned(1)).toBe('bottom');
+        });
+
+        it('does not duplicate a pinned row in the unpinned body', () => {
+            table.pinRow(2, 'top');
+            const rows = table.getRows();
+            expect(rows.filter(r => r.id === 2).length).toBe(1);
+        });
+
+        it('unpins with null', () => {
+            table.pinRow(2, 'top');
+            table.pinRow(2, null);
+            expect(table.isRowPinned(2)).toBeNull();
+            expect(table.getRows()[0].id).toBe(1); // back to natural order
+        });
+
+        it('renders pinned rows on every page, outside normal pagination', () => {
+            table.pinRow(5, 'top'); // Eve
+            table.setPageSize(2);
+            table.setPage(1); // second page of the remaining 4 rows
+            const rows = table.getRows();
+            expect(rows[0].id).toBe(5); // still pinned first
+            expect(rows.length).toBe(3); // 1 pinned + 2 page rows
+        });
+
+        it('excludes pinned rows from getTotalPages() so pagination reflects the scrollable body', () => {
+            table.pinRow(1, 'top');
+            table.setPageSize(2);
+            expect(table.getTotalPages()).toBe(2); // 4 unpinned rows / 2 per page
+        });
+
+        it('omits a pinned row that no longer matches the current filter', () => {
+            table.pinRow(2, 'top'); // Bob, role Manager
+            table.setFilter('role', 'Dev');
+            expect(table.getRows().some(r => r.id === 2)).toBe(false);
+        });
+
+        it('is a no-op while grouping is active', () => {
+            table.pinRow(1, 'top');
+            table.setGrouping(['role']);
+            const rows = table.getRows();
+            expect(rows.some(r => (r as any).isGroup)).toBe(true);
+        });
+
+        it('getPinnedRows() resolves the pinned row objects, in pin order', () => {
+            table.pinRow(1, 'top');
+            table.pinRow(4, 'top');
+            table.pinRow(2, 'bottom');
+            const { top, bottom } = table.getPinnedRows();
+            expect(top.map(r => r.id)).toEqual([1, 4]);
+            expect(bottom.map(r => r.id)).toEqual([2]);
+        });
+    });
+
+    describe('getAllFilteredRows() memoization', () => {
+        it('returns the same array reference when nothing relevant has changed', () => {
+            const first = table.getAllFilteredRows();
+            const second = table.getAllFilteredRows();
+            expect(second).toBe(first);
+        });
+
+        it('recomputes after a query-state change (e.g. search)', () => {
+            const first = table.getAllFilteredRows();
+            table.setSearch('dev');
+            const second = table.getAllFilteredRows();
+            expect(second).not.toBe(first);
+            expect(second.length).toBe(2);
+        });
+
+        it('recomputes after setData() even if the new array is deep-equal', () => {
+            const first = table.getAllFilteredRows();
+            table.setData([...mockData]); // new array reference, same contents
+            const second = table.getAllFilteredRows();
+            expect(second).not.toBe(first);
+        });
+
+        it('does not recompute for state changes the query pipeline does not read (e.g. pageIndex)', () => {
+            const first = table.getAllFilteredRows();
+            table.setPage(0); // no-op page change; irrelevant to filtering/sorting anyway
+            const second = table.getAllFilteredRows();
+            expect(second).toBe(first);
+        });
+    });
+
     describe('Pinning & Reordering', () => {
         it('should pin column', () => {
             table.pinColumn('name', 'left');
@@ -183,10 +280,13 @@ describe('LijiTable', () => {
             expect(widths.b).toBeGreaterThanOrEqual(80);
         });
 
-        it('ignores hidden columns', () => {
+        it('excludes hidden columns from the fill distribution, but still returns a width for them', () => {
             const withHidden: TableColumn[] = [...cols, { id: 'd', label: 'D', width: 100, hidden: true }];
             const widths = computeAutoFitWidths(withHidden, {}, 800, 0);
-            expect(widths.d).toBeUndefined();
+            // Hidden column doesn't affect the visible columns' share of the container...
+            expect(widths.a + widths.b + widths.c).toBe(800);
+            // ...but callers can still safely index widths[id] for a hidden column.
+            expect(widths.d).toBe(100);
         });
     });
 });

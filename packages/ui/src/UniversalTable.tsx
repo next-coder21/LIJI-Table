@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, CSSProperties } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, CSSProperties } from 'react';
 import { useUniversalTable } from '@liji-table/react';
 import { ICONS } from './icons';
 import './styles.css';
@@ -12,6 +12,8 @@ interface UniversalTableProps {
   density?: 'standard' | 'compact' | 'comfortable';
   showFilters?: boolean;
   showCheckboxes?: boolean; // ✅ NEW PROP
+  /** Shows a per-row 📌 button that pins the row to the top (renders on every page). */
+  showRowPin?: boolean;
   /** When provided, enables "Save Layout" / "Reset Layout" in the column context menu, persisting column order/width/pin/hidden/align to localStorage under this key. */
   persistKey?: string;
 }
@@ -39,9 +41,11 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
   density = 'standard',
   showFilters = false,
   showCheckboxes = false, // ✅ Default to false (Configurable)
+  showRowPin = false,
   persistKey
 }) => {
-  const internalHook = useUniversalTable(data, columns, { persistKey, reservedWidth: showCheckboxes ? 40 : 0 });
+  const reservedWidth = (showCheckboxes ? 40 : 0) + (showRowPin ? 32 : 0);
+  const internalHook = useUniversalTable(data, columns, { persistKey, reservedWidth });
   const table = tableInstance || internalHook;
 
   const {
@@ -49,21 +53,51 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
     toggleSelection, toggleAllPage, isAllPageSelected,
     getHeaderProps, getResizerProps,
     setSortDirection, pinColumn, setColumnAlign,
+    pinRow, isRowPinned,
     prevPage, nextPage, setPageSize, setFilter,
     saveLayout, resetLayout,
     containerRef, computedColumnWidths,
     // Virtualization
-    virtualRows, virtualPaddingTop, virtualPaddingBottom, onScroll
+    virtualRows, pinnedTopRows, pinnedBottomRows, virtualPaddingTop, virtualPaddingBottom, onScroll
   } = table;
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; colId: string; sortable: boolean; pinned?: 'left' | 'right' | null; } | null>(null);
+
+  // --- Sticky row offsets: pinned rows need a *measured* header height and
+  // row height (both vary with `density`/`showFilters`), not a guessed
+  // pixel value, so they stack under the header and against each other
+  // without gaps or overlap. Falls back to sane defaults before the first
+  // measurement (initial paint / SSR).
+  const theadRef = useRef<HTMLTableSectionElement>(null);
+  const firstRowRef = useRef<HTMLTableRowElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const [rowHeight, setRowHeight] = useState(41);
+
+  useLayoutEffect(() => {
+    const theadEl = theadRef.current;
+    if (!theadEl || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => setHeaderHeight(theadEl.offsetHeight));
+    observer.observe(theadEl);
+    setHeaderHeight(theadEl.offsetHeight);
+    return () => observer.disconnect();
+  }, [showFilters, density]);
+
+  useLayoutEffect(() => {
+    const rowEl = firstRowRef.current;
+    if (!rowEl || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => setRowHeight(rowEl.offsetHeight));
+    observer.observe(rowEl);
+    setRowHeight(rowEl.offsetHeight);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [density, pinnedTopRows.length, virtualRows.length]);
 
   // --- Sticky Logic (Updated for Checkbox) ---
   const stickyOffsets = useMemo(() => {
     const offsets: Record<string, { left?: number; right?: number }> = {};
 
-    // ✅ FIX: If checkboxes are shown, start left offset at 40px. If hidden, start at 0.
-    let currentLeft = showCheckboxes ? 40 : 0;
+    // If checkboxes and/or the row-pin column are shown, start the left offset past them.
+    let currentLeft = reservedWidth;
     let currentRight = 0;
 
     visibleColumns.forEach((c: any) => {
@@ -80,7 +114,7 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
       }
     });
     return offsets;
-  }, [visibleColumns, computedColumnWidths, showCheckboxes]);
+  }, [visibleColumns, computedColumnWidths, reservedWidth]);
 
   const getStickyStyle = (col: ColumnWithRender): CSSProperties => {
     if (!col.pinned) return {};
@@ -97,14 +131,59 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
     return () => window.removeEventListener('click', close);
   }, [contextMenu]);
 
+  /** Renders one data row. `rowRef`/`stickyStyle` are only passed for pinned rows. */
+  const renderDataRow = (row: any, opts?: { rowRef?: React.Ref<HTMLTableRowElement>; stickyStyle?: CSSProperties }) => {
+    const isSelected = selectedIds.includes(row.id);
+    const pinned = showRowPin && isRowPinned(row.id);
+    return (
+      <tr
+        key={row.id}
+        ref={opts?.rowRef}
+        className={`${isSelected ? 'liji-row-selected' : ''} ${pinned ? 'liji-row-pinned' : ''}`}
+        style={opts?.stickyStyle}
+        aria-selected={isSelected}
+        role="row"
+      >
+        {showRowPin && (
+          <td className="liji-td-row-pin" role="cell">
+            <button
+              type="button"
+              className={`liji-row-pin-btn ${pinned ? 'liji-row-pin-btn-active' : ''}`}
+              aria-label={pinned ? 'Unpin row' : 'Pin row to top'}
+              onClick={() => pinRow(row.id, pinned ? null : 'top')}
+            >📌</button>
+          </td>
+        )}
+        {showCheckboxes && (
+          <td className="liji-td-checkbox" role="cell">
+            <input type="checkbox" checked={isSelected} onChange={() => toggleSelection(row.id)} aria-label="Select Row" />
+          </td>
+        )}
+
+        {visibleColumns.map((c: any) => {
+          const col = c as ColumnWithRender;
+          return (
+            <td key={col.id}
+              className={col.pinned ? `liji-pinned-${col.pinned}` : ''}
+              style={{ textAlign: col.align || 'left', ...getStickyStyle(col) }}
+              role="cell">
+              {col.render ? col.render(row[col.id], row) : row[col.id]}
+            </td>
+          );
+        })}
+      </tr>
+    );
+  };
+
   return (
     <div className="liji-grid-wrapper" style={{ height }}>
 
       <div className="liji-table-scroll" ref={containerRef as any} onScroll={onScroll}>
         <table className={`liji-table liji-${density} ${enableStriped ? 'liji-striped' : ''}`} role="table" aria-label="Data Table">
-          <thead>
+          <thead ref={theadRef}>
             {/* Header Row */}
             <tr>
+              {showRowPin && <th className="liji-th-row-pin" />}
               {/* ✅ CONDITIONAL RENDER: Checkbox Header */}
               {showCheckboxes && (
                 <th className="liji-th-checkbox">
@@ -139,6 +218,7 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
             {/* Filter Row */}
             {showFilters && (
               <tr className="liji-filter-row">
+                {showRowPin && <th className="liji-th-row-pin" style={{ top: 45 }} />}
                 {/* ✅ CONDITIONAL RENDER: Checkbox Spacer in Filter Row */}
                 {showCheckboxes && <th className="liji-th-checkbox" style={{ top: 45 }}></th>}
 
@@ -163,33 +243,29 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
 
           {/* Body */}
           <tbody>
-            {virtualPaddingTop > 0 && <tr style={{ height: virtualPaddingTop }}><td colSpan={visibleColumns.length + (showCheckboxes ? 1 : 0)} /></tr>}
-            {virtualRows.map((row: any) => {
-              const isSelected = selectedIds.includes(row.id);
-              return (
-                <tr key={row.id} className={isSelected ? 'liji-row-selected' : ''} aria-selected={isSelected} role="row">
-                  {/* ✅ CONDITIONAL RENDER: Checkbox Cell */}
-                  {showCheckboxes && (
-                    <td className="liji-td-checkbox" role="cell">
-                      <input type="checkbox" checked={isSelected} onChange={() => toggleSelection(row.id)} aria-label="Select Row" />
-                    </td>
-                  )}
+            {/* Pinned-top rows: sticky, stacked directly under the header. Always
+                rendered regardless of scroll position - see pinnedTopRows in the hook. */}
+            {pinnedTopRows.map((row: any, i: number) =>
+              renderDataRow(row, {
+                rowRef: i === 0 ? firstRowRef : undefined,
+                stickyStyle: { position: 'sticky', top: headerHeight + i * rowHeight, zIndex: 5 },
+              })
+            )}
 
-                  {visibleColumns.map((c: any) => {
-                    const col = c as ColumnWithRender;
-                    return (
-                      <td key={col.id}
-                        className={col.pinned ? `liji-pinned-${col.pinned}` : ''}
-                        style={{ textAlign: col.align || 'left', ...getStickyStyle(col) }}
-                        role="cell">
-                        {col.render ? col.render(row[col.id], row) : row[col.id]}
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-            {virtualPaddingBottom > 0 && <tr style={{ height: virtualPaddingBottom }}><td colSpan={visibleColumns.length + (showCheckboxes ? 1 : 0)} /></tr>}
+            {virtualPaddingTop > 0 && <tr style={{ height: virtualPaddingTop }}><td colSpan={visibleColumns.length + (showCheckboxes ? 1 : 0) + (showRowPin ? 1 : 0)} /></tr>}
+            {virtualRows.map((row: any, i: number) =>
+              renderDataRow(row, { rowRef: pinnedTopRows.length === 0 && i === 0 ? firstRowRef : undefined })
+            )}
+            {virtualPaddingBottom > 0 && <tr style={{ height: virtualPaddingBottom }}><td colSpan={visibleColumns.length + (showCheckboxes ? 1 : 0) + (showRowPin ? 1 : 0)} /></tr>}
+
+            {/* Pinned-bottom rows: sticky to the bottom of the scroll container
+                (the footer sits outside .liji-table-scroll, so bottom:0 doesn't
+                collide with it). Stacked from the last row upward. */}
+            {pinnedBottomRows.map((row: any, i: number) =>
+              renderDataRow(row, {
+                stickyStyle: { position: 'sticky', bottom: (pinnedBottomRows.length - 1 - i) * rowHeight, zIndex: 5 },
+              })
+            )}
           </tbody>
         </table>
       </div>

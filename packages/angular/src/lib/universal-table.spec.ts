@@ -98,4 +98,24 @@ describe('UniversalTable (Angular Logic)', () => {
             expect(withoutKey.persistEnabled).toBe(false);
         });
     });
+
+    describe('row pinning', () => {
+        it('pinRow / isRowPinned pin a row to the top, ahead of pagination', () => {
+            const table = new UniversalTable(mockData, mockColumns);
+            table.pinRow(50, 'top');
+
+            expect(table.isRowPinned(50)).toBe('top');
+            expect(table.rows[0].id).toBe(50);
+        });
+
+        it('keeps a pinned row in pinnedTopRows even after scrolling it out of the virtualized window', () => {
+            const table = new UniversalTable(mockData, mockColumns);
+            table.pinRow(0, 'top');
+            table.setPageSize(100);
+            table.updateScroll(2000, 400); // scroll far down
+
+            expect(table.pinnedTopRows.map(r => r.id)).toEqual([0]);
+            expect(table.virtualRows.some((r: any) => r.id === 0)).toBe(false);
+        });
+    });
 });

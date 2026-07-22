@@ -65,10 +65,10 @@ npm install @liji-table/react @liji-table/core
 ```
 
 ```tsx
-import { useUniversalTable } from '@liji-table/react';
+import { useLijiTable } from '@liji-table/react';
 
 function MyTable({ data }) {
-  const table = useUniversalTable(data, [
+  const table = useLijiTable(data, [
     { id: 'name', label: 'Name', sortable: true },
     { id: 'email', label: 'Email', sortable: true },
     { id: 'role', label: 'Role' }
