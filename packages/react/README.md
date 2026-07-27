@@ -264,14 +264,3 @@ hasSavedLayout()
 - Resize does not trigger React renders
 - Optimized for large datasets
 
-## 🧩 When to Use This Library
-
-### ✅ Recommended
-- Admin dashboards
-- Analytics tools
-- Enterprise software
-- Custom design systems
-
-### ❌ Not Recommended
-- If you want a pre-styled table
-- If you don’t need advanced features
