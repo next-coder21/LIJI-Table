@@ -1,7 +1,7 @@
 # @liji-table/core
 
 <p align="center">
-  <img src="../../logo.png" alt="LIJI-Table Logo" width="400"/>
+  <img src="../../logo.png" alt="LIJI-Table Logo" width="220"/>
 </p>
 
 <p align="center">

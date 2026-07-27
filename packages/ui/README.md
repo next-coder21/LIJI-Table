@@ -1,5 +1,18 @@
 # @liji-table/ui
 
+<p align="center">
+  <img src="../../logo.png" alt="LIJI-Table Logo" width="220"/>
+</p>
+
+<p align="center">
+  <strong>Prebuilt Table UI for LIJI-Table</strong>
+</p>
+
+<p align="center">
+  <a href="https://npmjs.com/package/@liji-table/ui"><img src="https://img.shields.io/npm/v/@liji-table/ui" alt="npm version"/></a>
+  <img src="https://img.shields.io/bundlephobia/minzip/@liji-table/ui" alt="bundle size"/>
+</p>
+
 > **Version 0.0.9**
 
 A **ready-to-use, feature-rich table UI** built on top of `@liji-table/react` and `@liji-table/core`.  
@@ -82,8 +95,8 @@ A separate, reusable toolbar component.
 - Autosize columns
 - Column visibility menu
 
-#### Example 
-```
+#### Example
+```tsx
 import { UniversalTableToolbar } from "@liji-table/ui";
 
 <UniversalTableToolbar
@@ -99,7 +112,7 @@ import { UniversalTableToolbar } from "@liji-table/ui";
 ## 🎨 Styling
 
 This UI ships with a fully styled CSS file:
-``` 
+```tsx
 import "@liji-table/ui/styles.css";
 ```
 
@@ -123,7 +136,7 @@ import "@liji-table/ui/styles.css";
 ## 📌 Column Features Supported
 
 Each column supports:
-```
+```ts
 {
   id: string;
   label: string;
