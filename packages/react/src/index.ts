@@ -397,6 +397,12 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
     setColumnWidth: (colId: string, width: number) => table.setColumnWidth(colId, width),
     /** Batch-set multiple column widths in one update. Participates in `saveLayout()` persistence. */
     setColumnWidths: (widths: Record<string, number>) => table.setColumnWidths(widths),
+    /**
+     * Clears manually-set widths so `computedColumnWidths` goes back to proportionally
+     * filling the container, instead of the possible-leftover-space fit-to-content sizing
+     * `autoResizeAllColumns()` applies. Leaves order/pin/hidden/align untouched.
+     */
+    resetColumnWidths: () => table.resetColumnWidths(),
 
     // --- LAYOUT PERSISTENCE ---
     /** Persist the current column arrangement to localStorage (requires `persistKey`). */

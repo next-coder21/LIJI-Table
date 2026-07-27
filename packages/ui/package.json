@@ -1,6 +1,6 @@
 {
   "name": "@liji-table/ui",
-  "version": "0.0.8-beta.0",
+  "version": "0.0.9",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,8 +11,16 @@
     "build": "tsc && node -e \"require('fs').copyFileSync('src/styles.css','dist/styles.css')\""
   },
   "dependencies": {
-    "@liji-table/core": "*",
-    "react": "^18.0.0"
+    "@liji-table/core": "*"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "typescript": "^5.0.0"
   },
   "exports": {
     ".": "./dist/index.js",

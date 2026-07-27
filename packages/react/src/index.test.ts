@@ -129,6 +129,17 @@ describe('useUniversalTable (React Hook)', () => {
             expect(result.current.state.columnWidths.id).toBe(60);
             expect(result.current.state.columnWidths.name).toBe(300);
         });
+
+        it('exposes resetColumnWidths to clear manual widths back to auto-fill', () => {
+            const { result } = renderHook(() => useUniversalTable(mockData, mockColumns));
+            act(() => {
+                result.current.setColumnWidths({ id: 60, name: 300 });
+            });
+            act(() => {
+                result.current.resetColumnWidths();
+            });
+            expect(result.current.state.columnWidths).toEqual({});
+        });
     });
 
     describe('pinColumn reorder option', () => {

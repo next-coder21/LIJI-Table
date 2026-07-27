@@ -51,10 +51,10 @@ Liji Table uses a unique **headless-first architecture** that separates business
 
 | Package | Version | Description |
 |---------|---------|-------------|
-| [`@liji-table/core`](./packages/core) | 0.0.8-beta.0 | Framework-agnostic table engine |
-| [`@liji-table/react`](./packages/react) | 0.0.8-beta.0 | React hooks for table management |
-| [`@liji-table/angular`](./packages/angular) | 0.0.8-beta.0 | Angular components with RxJS |
-| [`@liji-table/ui`](./packages/ui) | 0.0.8-beta.0 | Pre-built React UI components |
+| [`@liji-table/core`](./packages/core) | 0.0.9 | Framework-agnostic table engine |
+| [`@liji-table/react`](./packages/react) | 0.0.9 | React hooks for table management |
+| [`@liji-table/angular`](./packages/angular) | 0.0.9 | Angular components with RxJS |
+| [`@liji-table/ui`](./packages/ui) | 0.0.9 | Pre-built React UI components |
 
 ## 🚀 Quick Start
 
@@ -187,7 +187,7 @@ npm test
 
 **Current Test Status**: ✅ All 34 tests passing across `core`, `react`, and `angular`
 
-## 🔄 Recent Updates (v0.0.8-beta.0)
+## 🔄 Recent Updates (v0.0.9)
 
 ### ✨ New Features
 - **Layout Persistence** - `saveLayout()` / `resetLayout()` / `hasSavedLayout()` on both the React hook and the Angular `UniversalTable` class, plus a `persistKey` option to auto-restore a saved column arrangement (order, width, pin, hidden, align) from `localStorage` on mount. The `@liji-table/ui` component and the Angular `<liji-table>` component both expose "💾 Save Layout" / "♻ Reset Layout" in the column context menu when `persistKey` is set.

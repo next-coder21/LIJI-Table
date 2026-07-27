@@ -1,6 +1,6 @@
 {
   "name": "@liji-table/react",
-  "version": "0.0.8-beta.0",
+  "version": "0.0.9",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

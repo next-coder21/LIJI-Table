@@ -218,6 +218,12 @@ export class UniversalTable<T extends { id: any }> {
   setColumnAlign(colId: string, align: ColumnAlign) { this.core.setColumnAlign(colId, align); }
   pinColumn(colId: string, pin: 'left' | 'right' | null) { this.core.pinColumn(colId, pin); }
   autoResizeAllColumns() { this.core.autoResizeAllColumns(); }
+  /**
+   * Clears manually-set widths so `getComputedColumnWidths()`/`computedColumnWidths$` go back
+   * to proportionally filling the container, instead of the possible-leftover-space
+   * fit-to-content sizing `autoResizeAllColumns()` applies. Leaves order/pin/hidden/align untouched.
+   */
+  resetColumnWidths() { this.core.resetColumnWidths(); }
 
   // Export
   downloadCSV(fileName = 'export.csv') {
@@ -244,7 +250,12 @@ export class UniversalTable<T extends { id: any }> {
     if (!col || !col.pinned) return {};
 
     const widths = this.getComputedColumnWidths();
-    const style: any = { position: 'sticky', zIndex: 2 };
+    // NOTE: z-index is intentionally left to CSS, not set inline here. The
+    // component styles give a pinned *header* cell a higher z-index (20) than
+    // a pinned *body* cell (2) so the header stays above scrolling body
+    // content; forcing z-index inline here would flatten both to the same
+    // value and let scrolling cells bleed over the pinned header.
+    const style: any = { position: 'sticky' };
 
     if (col.pinned === 'left') {
       let left = showCheckboxes ? 40 : 0;

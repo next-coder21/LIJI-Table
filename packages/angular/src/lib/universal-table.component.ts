@@ -13,7 +13,6 @@ import { UniversalTable } from './universal-table';
         <table class="liji-table" [ngClass]="'liji-' + density" [class.liji-striped]="enableStriped" role="table" aria-label="Data Table">
           <thead #theadEl>
             <tr>
-              <th *ngIf="showRowPin" class="liji-th-row-pin"></th>
               <th *ngIf="showCheckboxes" class="liji-th-checkbox">
                 <input type="checkbox" [checked]="table.isAllPageSelected()" (change)="table.toggleAllPage()">
               </th>
@@ -35,7 +34,6 @@ import { UniversalTable } from './universal-table';
                   [attr.aria-sort]="(table.state$ | async)?.sortColumn === col.id ? ((table.state$ | async)?.sortDirection === 'asc' ? 'ascending' : 'descending') : null"
               >
                  <div class="liji-th-content" [style.justify-content]="col.align || 'flex-start'">
-                    <span *ngIf="col.pinned" class="liji-pin-icon">📌</span>
                     {{ col.label }}
                     <span *ngIf="(table.state$ | async)?.sortColumn === col.id" class="liji-sort-icon">
                        {{ (table.state$ | async)?.sortDirection === 'asc' ? '↑' : '↓' }}
@@ -46,12 +44,10 @@ import { UniversalTable } from './universal-table';
             </tr>
 
             <tr *ngIf="showFilters" class="liji-filter-row">
-               <th *ngIf="showRowPin" class="liji-th-row-pin" style="top:45px"></th>
-               <th *ngIf="showCheckboxes" class="liji-th-checkbox" style="top:45px"></th>
+               <th *ngIf="showCheckboxes" class="liji-th-checkbox" [style.top.px]="headerRowHeight"></th>
                <th *ngFor="let col of (table.visibleColumns$ | async)"
                    [ngClass]="col.pinned ? 'liji-pinned-' + col.pinned : ''"
                    [ngStyle]="getFilterStickyStyle(col.id)"
-                   style="top:45px; z-index: 9"
                >
                  <input class="liji-filter-input" placeholder="Filter..."
                         (input)="onFilterChange(col.id, $event)">
@@ -98,12 +94,19 @@ import { UniversalTable } from './universal-table';
 
       <div *ngIf="contextMenu" class="liji-context-menu" [style.top.px]="contextMenu.y" [style.left.px]="contextMenu.x">
           <div class="liji-menu-header">Actions</div>
+          <div class="liji-menu-item" (click)="action('autosizeAll')"><span>⟷</span> Autosize All</div>
+          <div class="liji-menu-item" (click)="action('fillContainer')"><span>⤢</span> Fill Container</div>
+          <div class="liji-menu-divider"></div>
           <div class="liji-menu-item" (click)="action('sortAsc')">Sort Asc</div>
           <div class="liji-menu-item" (click)="action('sortDesc')">Sort Desc</div>
           <div class="liji-menu-divider"></div>
           <div class="liji-menu-item" (click)="action('pinLeft')">Pin Left</div>
           <div class="liji-menu-item" (click)="action('pinRight')">Pin Right</div>
           <div class="liji-menu-item" (click)="action('unpin')">Unpin</div>
+          <div class="liji-menu-divider"></div>
+          <div class="liji-menu-item" (click)="action('alignLeft')">Align Left</div>
+          <div class="liji-menu-item" (click)="action('alignCenter')">Align Center</div>
+          <div class="liji-menu-item" (click)="action('alignRight')">Align Right</div>
           <ng-container *ngIf="table.persistEnabled">
             <div class="liji-menu-divider"></div>
             <div class="liji-menu-item" (click)="action('saveLayout')">💾 Save Layout</div>
@@ -112,26 +115,31 @@ import { UniversalTable } from './universal-table';
       </div>
       <div *ngIf="contextMenu" (click)="contextMenu = null" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:99;"></div>
 
+      <!-- Row context menu (pin/unpin a row) -->
+      <div *ngIf="rowMenu" class="liji-context-menu" [style.top.px]="rowMenu.y" [style.left.px]="rowMenu.x">
+          <div class="liji-menu-header">Row</div>
+          <ng-container *ngIf="rowMenu.pinned; else notPinned">
+            <div class="liji-menu-item" (click)="rowAction(null)">Unpin row</div>
+          </ng-container>
+          <ng-template #notPinned>
+            <div class="liji-menu-item" (click)="rowAction('top')">Pin row to top</div>
+            <div class="liji-menu-item" (click)="rowAction('bottom')">Pin row to bottom</div>
+          </ng-template>
+      </div>
+      <div *ngIf="rowMenu" (click)="rowMenu = null" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:99;"></div>
+
     </div>
 
     <!-- Shared row markup for pinned-top / windowed / pinned-bottom rows. -->
     <ng-template #rowTpl let-row="row" let-sticky="sticky">
       <tr #rowEl
-          [style]="sticky"
+          [ngStyle]="sticky"
           [class.liji-row-selected]="table.selectedIds.includes($any(row).id)"
           [class.liji-row-pinned]="table.isRowPinned($any(row).id)"
           [attr.aria-selected]="table.selectedIds.includes($any(row).id)"
+          (contextmenu)="showRowPin && onRowContextMenu($event, $any(row).id)"
           role="row">
 
-        <td *ngIf="showRowPin" class="liji-td-row-pin">
-          <button
-            type="button"
-            class="liji-row-pin-btn"
-            [class.liji-row-pin-btn-active]="table.isRowPinned($any(row).id)"
-            [attr.aria-label]="table.isRowPinned($any(row).id) ? 'Unpin row' : 'Pin row to top'"
-            (click)="table.pinRow($any(row).id, table.isRowPinned($any(row).id) ? null : 'top')"
-          >📌</button>
-        </td>
         <td *ngIf="showCheckboxes" class="liji-td-checkbox">
           <input type="checkbox" [checked]="table.selectedIds.includes($any(row).id)" (change)="table.toggleSelection($any(row).id)">
         </td>
@@ -157,7 +165,8 @@ export class UniversalTableComponent implements AfterViewInit, OnChanges, OnDest
   @Input() enableStriped = false;
   @Input() showCheckboxes = false;
   @Input() showFilters = false;
-  /** Shows a per-row 📌 button that pins the row to the top (renders on every page). */
+  /** Enables row pinning: right-click a row to pin it to top/bottom. Pinned rows stay
+   *  sticky on every page and are shown with a duller background (no pin column/icon). */
   @Input() showRowPin = false;
   @Input() density: 'standard' | 'compact' | 'comfortable' = 'standard';
   @Input() cellTemplates: Record<string, TemplateRef<any>> = {};
@@ -170,38 +179,57 @@ export class UniversalTableComponent implements AfterViewInit, OnChanges, OnDest
   private headerResizeObserver?: ResizeObserver;
   private rowResizeObserver?: ResizeObserver;
 
-  // Sticky row offsets: pinned rows need a *measured* header height and row
-  // height (both vary with `density`/`showFilters`), not a guessed pixel
-  // value, so they stack under the header and against each other without
-  // gaps or overlap.
+  // Sticky offsets need *measured* heights (they vary with `density`/font),
+  // not guessed pixel values:
+  //  - headerHeight    = full <thead> height → where pinned rows stick.
+  //  - headerRowHeight = the header <tr> height → where the filter <tr> sticks
+  //    (a hardcoded value here is the classic cause of a 1-row gap/overlap
+  //     between the header, the filter row, and the first pinned row).
   headerHeight = 0;
+  headerRowHeight = 45;
   rowHeight = 41;
 
   contextMenu: { x: number, y: number, colId: string } | null = null;
+  rowMenu: { x: number, y: number, rowId: any, pinned: 'top' | 'bottom' | null } | null = null;
 
   ngOnChanges() {
     // Keep the checkbox column's width reserved out of the auto-fit
     // calculation for un-resized columns (see computeAutoFitWidths).
-    this.table?.setReservedWidth((this.showCheckboxes ? 40 : 0) + (this.showRowPin ? 32 : 0));
+    this.table?.setReservedWidth(this.showCheckboxes ? 40 : 0);
   }
 
   ngAfterViewInit() {
-    const node = this.scrollContainerRef?.nativeElement;
-    if (node && typeof ResizeObserver !== 'undefined') {
-      this.table.updateContainerWidth(node.clientWidth);
-      this.containerResizeObserver = new ResizeObserver(() => this.table.updateContainerWidth(node.clientWidth));
-      this.containerResizeObserver.observe(node);
-    }
+    // Deferred to a new macrotask: measuring here and writing it back
+    // synchronously (updateContainerWidth -> computedColumnWidths$ emits ->
+    // width bindings change) would land inside the same change-detection
+    // cycle Angular's dev-mode "no changes" pass just verified, triggering
+    // NG0100 (ExpressionChangedAfterItHasBeenCheckedError). Deferring runs
+    // it in a fresh cycle instead.
+    setTimeout(() => {
+      const node = this.scrollContainerRef?.nativeElement;
+      if (node && typeof ResizeObserver !== 'undefined') {
+        this.table.updateContainerWidth(node.clientWidth);
+        this.containerResizeObserver = new ResizeObserver(() => this.table.updateContainerWidth(node.clientWidth));
+        this.containerResizeObserver.observe(node);
+      }
 
-    const theadEl = this.theadElRef?.nativeElement;
-    if (theadEl && typeof ResizeObserver !== 'undefined') {
-      this.headerHeight = theadEl.offsetHeight;
-      this.headerResizeObserver = new ResizeObserver(() => { this.headerHeight = theadEl.offsetHeight; });
-      this.headerResizeObserver.observe(theadEl);
-    }
+      const theadEl = this.theadElRef?.nativeElement;
+      if (theadEl && typeof ResizeObserver !== 'undefined') {
+        const measure = () => {
+          this.headerHeight = theadEl.offsetHeight;
+          // First <tr> in the thead = the header row; the filter row sticks
+          // right below it.
+          const headerRow = theadEl.querySelector('tr');
+          if (headerRow) this.headerRowHeight = (headerRow as HTMLElement).offsetHeight;
+        };
+        measure();
+        this.headerResizeObserver = new ResizeObserver(measure);
+        this.headerResizeObserver.observe(theadEl);
+      }
 
-    this.observeFirstRow();
-    this.rowEls.changes.subscribe(() => this.observeFirstRow());
+      this.observeFirstRow();
+      this.rowEls.changes.subscribe(() => this.observeFirstRow());
+    });
   }
 
   /** Re-measures row height off whichever row renders first (pinned or windowed) - re-run whenever the rendered row set changes. */
@@ -240,7 +268,9 @@ export class UniversalTableComponent implements AfterViewInit, OnChanges, OnDest
 
   getFilterStickyStyle(colId: string) {
     const style = this.table.getStickyStyle(colId, this.showCheckboxes);
-    return { ...style, top: '45px', zIndex: style['zIndex'] ? 21 : 9 };
+    // `style` now carries `position: 'sticky'` only for pinned columns, so use
+    // that as the "is this column pinned?" signal for the higher z-index.
+    return { ...style, top: `${this.headerRowHeight}px`, zIndex: style['position'] ? 21 : 9 };
   }
 
   onContextMenu(e: MouseEvent, colId: string) {
@@ -248,15 +278,30 @@ export class UniversalTableComponent implements AfterViewInit, OnChanges, OnDest
     this.contextMenu = { x: e.clientX, y: e.clientY, colId };
   }
 
+  onRowContextMenu(e: MouseEvent, rowId: any) {
+    e.preventDefault();
+    this.rowMenu = { x: e.clientX, y: e.clientY, rowId, pinned: this.table.isRowPinned(rowId) };
+  }
+
+  rowAction(pin: 'top' | 'bottom' | null) {
+    if (this.rowMenu) this.table.pinRow(this.rowMenu.rowId, pin);
+    this.rowMenu = null;
+  }
+
   action(type: string) {
     if (!this.contextMenu) return;
     const { colId } = this.contextMenu;
 
+    if (type === 'autosizeAll') this.table.autoResizeAllColumns();
+    if (type === 'fillContainer') this.table.resetColumnWidths();
     if (type === 'sortAsc') this.table.setSortDirection(colId, 'asc');
     if (type === 'sortDesc') this.table.setSortDirection(colId, 'desc');
     if (type === 'pinLeft') this.table.pinColumn(colId, 'left');
     if (type === 'pinRight') this.table.pinColumn(colId, 'right');
     if (type === 'unpin') this.table.pinColumn(colId, null);
+    if (type === 'alignLeft') this.table.setColumnAlign(colId, 'left');
+    if (type === 'alignCenter') this.table.setColumnAlign(colId, 'center');
+    if (type === 'alignRight') this.table.setColumnAlign(colId, 'right');
     if (type === 'saveLayout') this.table.saveLayout();
     if (type === 'resetLayout') this.table.resetLayout();
 

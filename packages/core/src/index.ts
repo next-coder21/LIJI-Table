@@ -217,9 +217,13 @@ export class LijiTable<T extends { id: any }> {
   private state: TableState;
   private listeners: ((state: TableState) => void)[] = [];
   private cellChangeCallbacks: ((rowId: string | number, columnId: string, newValue: any, oldValue: any) => void)[] = [];
+  /** Column id -> its index in the column list as originally provided, used to put an
+   *  unpinned column back next to its natural neighbors instead of always at the end. */
+  private naturalColumnOrder = new Map<string, number>();
 
   constructor(initialData: T[], initialColumns: TableColumn[]) {
     this.data = initialData;
+    initialColumns.forEach((c, i) => this.naturalColumnOrder.set(c.id, i));
     this.state = {
       columns: initialColumns,
       columnWidths: {},
@@ -617,6 +621,19 @@ export class LijiTable<T extends { id: any }> {
     });
   }
 
+  /**
+   * Clears every manually-set column width so `computeAutoFitWidths` (called by
+   * each binding's render/measurement path) goes back to proportionally filling
+   * the full container width, instead of leaving empty space the way
+   * `autoResizeAllColumns()`'s fit-to-**content** sizing can when the container
+   * is wider than the content. Unlike `applyLayoutSnapshot`/layout reset, this
+   * only touches widths - column order, pinning, hidden state and alignment are
+   * left exactly as they are.
+   */
+  resetColumnWidths() {
+    this.setState({ columnWidths: {} });
+  }
+
   toggleVisibility(colId: string) {
     const columns = this.state.columns.map(c =>
       c.id === colId ? { ...c, hidden: !c.hidden } : c
@@ -675,9 +692,21 @@ export class LijiTable<T extends { id: any }> {
       const insertIndex = firstRightPinnedIndex === -1 ? columns.length : firstRightPinnedIndex;
       columns.splice(insertIndex, 0, targetColumn);
     } else {
-      // Unpinned: Insert after left-pinned, before right-pinned
+      // Unpinned: put it back among the unpinned columns in its natural
+      // (originally-provided) relative order, rather than always dumping it
+      // at the end of the unpinned zone.
+      const targetNaturalIndex = this.naturalColumnOrder.get(colId) ?? Infinity;
       const firstRightPinnedIndex = columns.findIndex(c => c.pinned === 'right');
-      const insertIndex = firstRightPinnedIndex === -1 ? columns.length : firstRightPinnedIndex;
+      const unpinnedZoneEnd = firstRightPinnedIndex === -1 ? columns.length : firstRightPinnedIndex;
+      let insertIndex = unpinnedZoneEnd;
+      for (let i = 0; i < unpinnedZoneEnd; i++) {
+        if (columns[i].pinned) continue; // skip left-pinned columns at the start
+        const naturalIndex = this.naturalColumnOrder.get(columns[i].id) ?? Infinity;
+        if (naturalIndex > targetNaturalIndex) {
+          insertIndex = i;
+          break;
+        }
+      }
       columns.splice(insertIndex, 0, targetColumn);
     }
 

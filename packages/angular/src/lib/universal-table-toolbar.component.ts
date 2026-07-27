@@ -24,7 +24,8 @@ import { UniversalTable } from './universal-table';
 
         <div class="liji-divider-vertical" style="width:1px; height:20px; background:#eaecf0; margin:0 4px"></div>
 
-        <button class="liji-btn-page" (click)="table.autoResizeAllColumns()"><span>⟷</span> Fit</button>
+        <button class="liji-btn-page" title="Fit each column to its content (may leave empty space)" (click)="table.autoResizeAllColumns()"><span>⟷</span> Fit</button>
+        <button class="liji-btn-page" title="Clear manual widths and fill the container" (click)="table.resetColumnWidths()"><span>⤢</span> Fill</button>
 
         <div style="position: relative;">
           <button class="liji-btn-page" (click)="showColMenu = !showColMenu"><span>👁</span> Cols</button>

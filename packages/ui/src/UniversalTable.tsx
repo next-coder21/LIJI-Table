@@ -12,7 +12,8 @@ interface UniversalTableProps {
   density?: 'standard' | 'compact' | 'comfortable';
   showFilters?: boolean;
   showCheckboxes?: boolean; // ✅ NEW PROP
-  /** Shows a per-row 📌 button that pins the row to the top (renders on every page). */
+  /** Enables row pinning: right-click a row to pin it to top/bottom (pinned rows stay
+   *  sticky on every page and are shown with a duller background — no pin column/icon). */
   showRowPin?: boolean;
   /** When provided, enables "Save Layout" / "Reset Layout" in the column context menu, persisting column order/width/pin/hidden/align to localStorage under this key. */
   persistKey?: string;
@@ -44,7 +45,7 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
   showRowPin = false,
   persistKey
 }) => {
-  const reservedWidth = (showCheckboxes ? 40 : 0) + (showRowPin ? 32 : 0);
+  const reservedWidth = showCheckboxes ? 40 : 0;
   const internalHook = useUniversalTable(data, columns, { persistKey, reservedWidth });
   const table = tableInstance || internalHook;
 
@@ -62,6 +63,9 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
   } = table;
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; colId: string; sortable: boolean; pinned?: 'left' | 'right' | null; } | null>(null);
+  // Right-click a body row to pin/unpin it (the dedicated pin column was
+  // removed in favor of a duller "pinned" background + this menu).
+  const [rowMenu, setRowMenu] = useState<{ x: number; y: number; rowId: any; pinned: 'top' | 'bottom' | null } | null>(null);
 
   // --- Sticky row offsets: pinned rows need a *measured* header height and
   // row height (both vary with `density`/`showFilters`), not a guessed
@@ -71,14 +75,22 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
   const theadRef = useRef<HTMLTableSectionElement>(null);
   const firstRowRef = useRef<HTMLTableRowElement>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
+  // The header <tr> height (where the filter row sticks). Hardcoding this
+  // caused a gap/overlap between the header, filter row, and first pinned row.
+  const [headerRowHeight, setHeaderRowHeight] = useState(45);
   const [rowHeight, setRowHeight] = useState(41);
 
   useLayoutEffect(() => {
     const theadEl = theadRef.current;
     if (!theadEl || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(() => setHeaderHeight(theadEl.offsetHeight));
+    const measure = () => {
+      setHeaderHeight(theadEl.offsetHeight);
+      const headerRow = theadEl.querySelector('tr');
+      if (headerRow) setHeaderRowHeight((headerRow as HTMLElement).offsetHeight);
+    };
+    const observer = new ResizeObserver(measure);
     observer.observe(theadEl);
-    setHeaderHeight(theadEl.offsetHeight);
+    measure();
     return () => observer.disconnect();
   }, [showFilters, density]);
 
@@ -126,15 +138,15 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
   };
 
   useEffect(() => {
-    const close = () => setContextMenu(null);
-    if (contextMenu) window.addEventListener('click', close);
+    const close = () => { setContextMenu(null); setRowMenu(null); };
+    if (contextMenu || rowMenu) window.addEventListener('click', close);
     return () => window.removeEventListener('click', close);
-  }, [contextMenu]);
+  }, [contextMenu, rowMenu]);
 
   /** Renders one data row. `rowRef`/`stickyStyle` are only passed for pinned rows. */
   const renderDataRow = (row: any, opts?: { rowRef?: React.Ref<HTMLTableRowElement>; stickyStyle?: CSSProperties }) => {
     const isSelected = selectedIds.includes(row.id);
-    const pinned = showRowPin && isRowPinned(row.id);
+    const pinned = showRowPin ? isRowPinned(row.id) : null;
     return (
       <tr
         key={row.id}
@@ -143,17 +155,8 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
         style={opts?.stickyStyle}
         aria-selected={isSelected}
         role="row"
+        onContextMenu={showRowPin ? (e: any) => { e.preventDefault(); setRowMenu({ x: e.clientX, y: e.clientY, rowId: row.id, pinned }); } : undefined}
       >
-        {showRowPin && (
-          <td className="liji-td-row-pin" role="cell">
-            <button
-              type="button"
-              className={`liji-row-pin-btn ${pinned ? 'liji-row-pin-btn-active' : ''}`}
-              aria-label={pinned ? 'Unpin row' : 'Pin row to top'}
-              onClick={() => pinRow(row.id, pinned ? null : 'top')}
-            >📌</button>
-          </td>
-        )}
         {showCheckboxes && (
           <td className="liji-td-checkbox" role="cell">
             <input type="checkbox" checked={isSelected} onChange={() => toggleSelection(row.id)} aria-label="Select Row" />
@@ -183,7 +186,6 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
           <thead ref={theadRef}>
             {/* Header Row */}
             <tr>
-              {showRowPin && <th className="liji-th-row-pin" />}
               {/* ✅ CONDITIONAL RENDER: Checkbox Header */}
               {showCheckboxes && (
                 <th className="liji-th-checkbox">
@@ -205,7 +207,6 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
                     onContextMenu={(e: any) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, colId: col.id, sortable: col.sortable !== false, pinned: col.pinned }); }}
                   >
                     <div className="liji-th-content" style={{ justifyContent: col.align || 'flex-start' }}>
-                      {col.pinned && <span className="liji-pin-icon">📌</span>}
                       {col.label}
                       {state.sortColumn === col.id && <span className="liji-sort-icon" dangerouslySetInnerHTML={{ __html: state.sortDirection === 'asc' ? ICONS.sortAsc : ICONS.sortDesc }} />}
                     </div>
@@ -218,16 +219,15 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
             {/* Filter Row */}
             {showFilters && (
               <tr className="liji-filter-row">
-                {showRowPin && <th className="liji-th-row-pin" style={{ top: 45 }} />}
                 {/* ✅ CONDITIONAL RENDER: Checkbox Spacer in Filter Row */}
-                {showCheckboxes && <th className="liji-th-checkbox" style={{ top: 45 }}></th>}
+                {showCheckboxes && <th className="liji-th-checkbox" style={{ top: headerRowHeight }}></th>}
 
                 {visibleColumns.map((c: any) => {
                   const col = c as ColumnWithRender;
                   return (
                     <th key={`${col.id}-filter`}
                       className={col.pinned ? `liji-pinned-${col.pinned}` : ''}
-                      style={{ ...getStickyStyle(col), top: 45, zIndex: col.pinned ? 21 : 9, padding: '4px' }}
+                      style={{ ...getStickyStyle(col), top: headerRowHeight, zIndex: col.pinned ? 21 : 9, padding: '4px' }}
                     >
                       <input
                         className="liji-filter-input"
@@ -252,11 +252,11 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
               })
             )}
 
-            {virtualPaddingTop > 0 && <tr style={{ height: virtualPaddingTop }}><td colSpan={visibleColumns.length + (showCheckboxes ? 1 : 0) + (showRowPin ? 1 : 0)} /></tr>}
+            {virtualPaddingTop > 0 && <tr style={{ height: virtualPaddingTop }}><td colSpan={visibleColumns.length + (showCheckboxes ? 1 : 0)} /></tr>}
             {virtualRows.map((row: any, i: number) =>
               renderDataRow(row, { rowRef: pinnedTopRows.length === 0 && i === 0 ? firstRowRef : undefined })
             )}
-            {virtualPaddingBottom > 0 && <tr style={{ height: virtualPaddingBottom }}><td colSpan={visibleColumns.length + (showCheckboxes ? 1 : 0) + (showRowPin ? 1 : 0)} /></tr>}
+            {virtualPaddingBottom > 0 && <tr style={{ height: virtualPaddingBottom }}><td colSpan={visibleColumns.length + (showCheckboxes ? 1 : 0)} /></tr>}
 
             {/* Pinned-bottom rows: sticky to the bottom of the scroll container
                 (the footer sits outside .liji-table-scroll, so bottom:0 doesn't
@@ -287,6 +287,7 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
         <div className="liji-context-menu" style={{ top: contextMenu.y, left: contextMenu.x }}>
           <div className="liji-menu-header">Actions</div>
           <div className="liji-menu-item" onClick={() => { table.autoResizeAllColumns(); setContextMenu(null); }}><span>⟷</span> Autosize All</div>
+          <div className="liji-menu-item" onClick={() => { table.resetColumnWidths(); setContextMenu(null); }}><span>⤢</span> Fill Container</div>
           <div className="liji-menu-divider" />
           {contextMenu.sortable && <>
             <div className="liji-menu-item" onClick={() => { setSortDirection(contextMenu.colId, 'asc'); setContextMenu(null); }}>Sort Asc</div>
@@ -305,6 +306,21 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
             <div className="liji-menu-item" onClick={() => { saveLayout(); setContextMenu(null); }}>💾 Save Layout</div>
             <div className="liji-menu-item" onClick={() => { resetLayout(); setContextMenu(null); }}>♻ Reset Layout</div>
           </>}
+        </div>
+      )}
+
+      {/* Row Context Menu (pin/unpin a row) */}
+      {rowMenu && (
+        <div className="liji-context-menu" style={{ top: rowMenu.y, left: rowMenu.x }}>
+          <div className="liji-menu-header">Row</div>
+          {rowMenu.pinned ? (
+            <div className="liji-menu-item" onClick={() => { pinRow(rowMenu.rowId, null); setRowMenu(null); }}>Unpin row</div>
+          ) : (
+            <>
+              <div className="liji-menu-item" onClick={() => { pinRow(rowMenu.rowId, 'top'); setRowMenu(null); }}>Pin row to top</div>
+              <div className="liji-menu-item" onClick={() => { pinRow(rowMenu.rowId, 'bottom'); setRowMenu(null); }}>Pin row to bottom</div>
+            </>
+          )}
         </div>
       )}
     </div>

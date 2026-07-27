@@ -1,6 +1,6 @@
 # @liji-table/ui
 
-> **Version 0.0.8-beta.0**
+> **Version 0.0.9**
 
 A **ready-to-use, feature-rich table UI** built on top of `@liji-table/react` and `@liji-table/core`.  
 It provides a **polished table layout, toolbar, styles, and interactions**, while still keeping the architecture **headless-first and customizable**.
@@ -27,8 +27,8 @@ This package includes:
 - 📐 **Density modes** (standard / compact / comfortable)
 - 📤 **CSV export**
 - 📱 Scrollable + sticky headers
-- 💾 **Layout persistence** – "Save Layout" / "Reset Layout" in the column context menu (v0.0.8-beta.0+)
-- 📐 **Auto-fit column widths** – un-resized columns fill the container by default; resizing one never shifts another (v0.0.8-beta.0+)
+- 💾 **Layout persistence** – "Save Layout" / "Reset Layout" in the column context menu (v0.0.9+)
+- 📐 **Auto-fit column widths** – un-resized columns fill the container by default; resizing one never shifts another (v0.0.9+)
 
 ---
 

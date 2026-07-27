@@ -1,10 +1,10 @@
 {
   "name": "@liji-table/angular",
-  "version": "0.0.8-beta.0",
+  "version": "0.0.9",
   "type": "module",
   "main": "dist/fesm2022/liji-table-angular.mjs",
   "module": "dist/fesm2022/liji-table-angular.mjs",
-  "types": "dist/index.d.ts",
+  "types": "dist/types/liji-table-angular.d.ts",
   "sideEffects": false,
   "scripts": {
     "build": "ng-packagr -p ng-package.json"
@@ -13,18 +13,18 @@
     "@liji-table/core": "*"
   },
   "peerDependencies": {
-    "@angular/common": ">=18.0.0",
-    "@angular/core": ">=18.0.0"
+    "@angular/common": ">=17.0.0",
+    "@angular/core": ">=17.0.0"
   },
   "devDependencies": {
-    "@angular/common": "^18.0.0",
-    "@angular/compiler": "^18.0.0",
-    "@angular/compiler-cli": "^18.2.14",
-    "@angular/core": "^18.0.0",
-    "@angular/platform-browser": "^18.0.0",
-    "ng-packagr": "^18.2.1",
+    "@angular/common": "^21.0.0",
+    "@angular/compiler": "^21.0.0",
+    "@angular/compiler-cli": "^21.0.0",
+    "@angular/core": "^21.0.0",
+    "@angular/platform-browser": "^21.0.0",
+    "ng-packagr": "^21.0.0",
     "rxjs": "^7.8.0",
-    "typescript": "^5.4.0",
-    "zone.js": "~0.14.0"
+    "typescript": "^5.9.0",
+    "zone.js": "~0.15.0"
   }
 }

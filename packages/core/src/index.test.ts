@@ -241,6 +241,29 @@ describe('LijiTable', () => {
             expect(cols[0].id).toBe('name');
             expect(cols[1].id).toBe('id');
         });
+
+        it('should restore a column to its natural position on unpin, not dump it at the end', () => {
+            // 'name' starts at index 1 (between 'id' and 'age').
+            table.pinColumn('name', 'left');
+            table.pinColumn('name', null);
+            const ids = table.getState().columns.map(c => c.id);
+            expect(ids).toEqual(['id', 'name', 'age', 'role']);
+        });
+    });
+
+    describe('resetColumnWidths', () => {
+        it('clears manually-set widths without touching column order/pin/hidden', () => {
+            table.setColumnWidths({ id: 300, name: 400 });
+            table.pinColumn('age', 'left');
+            table.toggleVisibility('role');
+
+            table.resetColumnWidths();
+
+            const state = table.getState();
+            expect(state.columnWidths).toEqual({});
+            expect(state.columns.find(c => c.id === 'age')?.pinned).toBe('left');
+            expect(state.columns.find(c => c.id === 'role')?.hidden).toBe(true);
+        });
     });
 
     describe('computeAutoFitWidths', () => {

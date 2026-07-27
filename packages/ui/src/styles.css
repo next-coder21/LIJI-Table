@@ -9,6 +9,11 @@
   --liji-hover-row: #f9fafb;
   --liji-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
   --liji-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.1);
+  /* "Pinned" indicator: a duller/muted fill (instead of pin icons) that
+     signals a pinned column or row. Header variant is a touch darker so a
+     pinned column reads against the header's own tint. */
+  --liji-pinned: #e6e8ee;
+  --liji-pinned-header: #dde0e8;
 }
 
 /* --- GLOBAL RESET FOR THIS COMPONENT --- */
@@ -130,22 +135,27 @@ th.liji-drag-over {
 .liji-table tbody tr:last-child td { border-bottom: none; }
 
 /* --- 6. PINNED COLUMNS (New) --- */
-/* These classes ensure pinned columns have separation */
+/* A pinned column is signalled by a duller/muted fill (no pin icon), and
+   the fill must be opaque so scrolling body content doesn't show through the
+   sticky cell. */
 .liji-pinned-left {
-  position: sticky; /* Missing this! */
-  left: 0;          /* You will need dynamic calculations if multiple cols are pinned */
+  position: sticky;
+  left: 0;          /* dynamic left offset is set inline per pinned column */
   z-index: 2;
-  background-color: var(--liji-white); /* Important so text doesn't flow under it */
-  border-right: 2px solid #d0d5dd !important; 
+  background-color: var(--liji-pinned);
+  border-right: 1px solid var(--liji-border);
 }
 .liji-pinned-right {
-  border-left: 2px solid #d0d5dd !important;
+  position: sticky;
   z-index: 2;
+  background-color: var(--liji-pinned);
+  border-left: 1px solid var(--liji-border);
 }
-/* Ensure header pinned columns sit above regular sticky headers */
+/* Header cells of a pinned column: slightly darker, and above regular sticky headers. */
 .liji-table thead th.liji-pinned-left,
 .liji-table thead th.liji-pinned-right {
-  z-index: 20; 
+  z-index: 20;
+  background-color: var(--liji-pinned-header);
 }
 
 
@@ -274,10 +284,10 @@ th.liji-drag-over {
 .liji-table.liji-striped tbody tr:nth-child(even) td {
   background-color: #fafafa; /* Very light gray */
 }
-/* Ensure sticky columns keep the stripe color */
+/* A pinned column keeps its duller fill even on striped even-rows. */
 .liji-table.liji-striped tbody tr:nth-child(even) td.liji-pinned-left,
 .liji-table.liji-striped tbody tr:nth-child(even) td.liji-pinned-right {
-  background-color: #fafafa;
+  background-color: var(--liji-pinned);
 }
 
 /* --- NEW: Filter Row --- */
@@ -326,54 +336,11 @@ th.liji-drag-over {
   transform: translateY(2px); /* Slight visual alignment */
 }
 
-.liji-th-row-pin,
-.liji-td-row-pin {
-  width: 32px !important;
-  min-width: 32px !important;
-  max-width: 32px !important;
-  padding: 0 !important;
-  text-align: center;
-  position: sticky !important;
-  left: 0;
-  z-index: 1;
-  background: var(--liji-white);
-  border-right: 1px solid var(--liji-border);
-}
-
-.liji-th-row-pin {
-  z-index: 30;
-  background: #fcfcfd;
-}
-
-/* When both the row-pin and checkbox columns are shown, the checkbox
-   column sits after the row-pin column, so its sticky offset shifts over. */
-.liji-th-row-pin ~ .liji-th-checkbox,
-.liji-td-row-pin ~ .liji-td-checkbox {
-  left: 32px;
-}
-
-.liji-row-pin-btn {
-  cursor: pointer;
-  border: none;
-  background: transparent;
-  padding: 2px;
-  border-radius: 4px;
-  font-size: 13px;
-  line-height: 1;
-  opacity: 0.35;
-  filter: grayscale(1);
-  transition: opacity 0.15s, filter 0.15s;
-}
-
-.liji-row-pin-btn:hover {
-  opacity: 0.75;
-}
-
-.liji-row-pin-btn-active {
-  opacity: 1;
-  filter: none;
-}
-
-.liji-row-pinned {
-  background: rgba(59, 130, 246, 0.04);
+/* --- Pinned rows ---
+   Row pinning has no pin column/button: a pinned row is signalled purely by
+   a duller/muted background (right-click a row to pin/unpin). The fill is set
+   on the cells (opaque) so the sticky pinned rows don't show scrolling content
+   through them, and it overrides striping and the pinned-column fill too. */
+.liji-table tbody tr.liji-row-pinned td {
+  background-color: var(--liji-pinned) !important;
 }

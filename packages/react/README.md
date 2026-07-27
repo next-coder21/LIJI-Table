@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/bundlephobia/minzip/@liji-table/react" alt="bundle size"/>
 </p>
 
-> **Version 0.0.8-beta.0**
+> **Version 0.0.9**
 
 A **headless, high-performance React table hook** built on top of `@liji-table/core`.  
 It provides all advanced table logic — sorting, filtering, pagination, resizing, selection, export, and pinning — while leaving **full UI control to the developer**.
@@ -22,11 +22,11 @@ It provides all advanced table logic — sorting, filtering, pagination, resizin
 
 ---
 
-## 🔄 What's New (v0.0.8-beta.0)
+## 🔄 What's New (v0.0.9)
 
 - ✅ **Layout persistence** - pass `{ persistKey: 'my-table' }` as the third argument to `useLijiTable`/`useUniversalTable` and the column arrangement auto-restores from `localStorage` on mount. Call the returned `saveLayout()` to persist the current arrangement, `resetLayout()` to clear it and restore the original columns, `hasSavedLayout()` to check.
 - ✅ **Auto-fit column widths** - attach the returned `containerRef` to your scrolling wrapper and un-resized columns will proportionally fill it (`computedColumnWidths`). Resizing one column no longer shifts any other column.
-- ✅ All improvements from `@liji-table/core` v0.0.8-beta.0
+- ✅ All improvements from `@liji-table/core` v0.0.9
 
 ---
 

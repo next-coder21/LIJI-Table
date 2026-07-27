@@ -18,7 +18,7 @@ export const UniversalTableToolbar: React.FC<ToolbarProps> = ({
   onToggleFilter,
   showFilter = false
 }) => {
-  const { downloadCSV, autoResizeAllColumns, allColumns, toggleVisibility } = table;
+  const { downloadCSV, autoResizeAllColumns, resetColumnWidths, allColumns, toggleVisibility } = table;
   
   // Local state for the "Cols" dropdown menu
   const [showColMenu, setShowColMenu] = useState(false);
@@ -64,11 +64,16 @@ export const UniversalTableToolbar: React.FC<ToolbarProps> = ({
 
         {/* --- GROUP 2: Layout Actions (Moved from Table) --- */}
         
-        {/* 1. Fit / Autosize */}
-        <button onClick={() => autoResizeAllColumns()} className="liji-btn-page" title="Autosize Columns">
+        {/* 1. Fit / Autosize (fit-to-content: can leave empty space if the container is wider) */}
+        <button onClick={() => autoResizeAllColumns()} className="liji-btn-page" title="Fit each column to its content (may leave empty space)">
             <span>⟷</span> Fit
         </button>
-        
+
+        {/* 1b. Fill (clears manual widths so columns proportionally fill the container) */}
+        <button onClick={() => resetColumnWidths()} className="liji-btn-page" title="Clear manual widths and fill the container">
+            <span>⤢</span> Fill
+        </button>
+
         {/* 2. Column Visibility Menu */}
         <div style={{ position: 'relative' }}>
           <button onClick={(e) => { e.stopPropagation(); setShowColMenu(!showColMenu); }} className="liji-btn-page" title="Show/Hide Columns">
