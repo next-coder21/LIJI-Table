@@ -50,7 +50,6 @@ export default function DocsGuides() {
   return (
     <div className="mt-14">
       <div className="flex items-center gap-2">
-        <span aria-hidden>🛰️</span>
         <h2 className="font-display text-xl font-semibold tracking-tight text-ink">Guides</h2>
       </div>
       <p className="mt-1.5 text-[14px] text-ink-muted">Step-by-step guides to get you up and running.</p>

@@ -16,8 +16,7 @@ const plexMono = IBM_Plex_Mono({
   display: "swap",
 });
 
-// Update this once the site has a real domain (or set NEXT_PUBLIC_SITE_URL at build time).
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://liji-table.example.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lijishwilson.in/liji-table";
 const TITLE = "Liji Table — the data-grid engine every framework deserves";
 const DESCRIPTION =
   "A framework-agnostic, headless table engine with React, Angular, and pre-built UI bindings. Sorting, filtering, grouping, virtualization, and layout persistence — in about 12kB.";

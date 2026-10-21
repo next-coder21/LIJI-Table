@@ -4,6 +4,7 @@ import Footer from "@/components/Footer";
 import CopyCommand from "@/components/CopyCommand";
 import AmbientStars from "@/components/AmbientStars";
 import DocsSidebar from "@/components/DocsSidebar";
+import MobileDocsNav from "@/components/MobileDocsNav";
 import DocsHero from "@/components/DocsHero";
 import DocsGuides from "@/components/DocsGuides";
 import DocsExample from "@/components/DocsExample";
@@ -86,8 +87,9 @@ const CORE_METHODS: Record<string, { signature: string; desc: string }[]> = {
     { signature: "table.setColumnWidth(colId, width)", desc: "Set one column's pixel width." },
     { signature: "table.setColumnWidths(widths)", desc: "Batch-set multiple widths in a single state update." },
     { signature: "table.autoResizeAllColumns()", desc: "Fit-to-content: sizes every column from a character-length heuristic, clamped 50–300px." },
+    { signature: "table.resetColumnWidths()", desc: "Clears manually-set widths so columns go back to proportionally filling the container (via computeAutoFitWidths) instead of leaving empty space." },
     { signature: "table.reorderColumn(fromIndex, toIndex)", desc: "Move a column to a new index." },
-    { signature: "table.pinColumn(colId, pin, opts?)", desc: "Pin 'left' | 'right' | null. Auto-reorders to the edge unless opts.reorder is false." },
+    { signature: "table.pinColumn(colId, pin, opts?)", desc: "Pin 'left' | 'right' | null. Auto-reorders to the edge unless opts.reorder is false — unpinning (null) restores the column to its natural position among the other unpinned columns rather than moving it to the end." },
     { signature: "table.toggleVisibility(colId)", desc: "Show/hide a column." },
     { signature: "table.setColumnAlign(colId, align)", desc: "Set 'left' | 'center' | 'right' text alignment." },
   ],
@@ -109,8 +111,11 @@ const CORE_METHODS: Record<string, { signature: string; desc: string }[]> = {
     { signature: "table.getCSVContent()", desc: "CSV string of exactly the currently visible columns." },
   ],
   "Layout persistence": [
-    { signature: "table.getLayoutSnapshot()", desc: "Serialize column order/width/pin/hidden/align to a plain object." },
-    { signature: "table.applyLayoutSnapshot(snapshot)", desc: "Restore a previously captured snapshot." },
+    { signature: "table.saveLayout(persistKey?)", desc: "Persist the current column order, widths, pin, hidden, and alignment to localStorage." },
+    { signature: "table.resetLayout(persistKey?)", desc: "Clear localStorage and revert columns to their original constructor definitions." },
+    { signature: "table.hasSavedLayout(persistKey?)", desc: "Check whether a saved layout exists in localStorage for this table." },
+    { signature: "table.getLayoutSnapshot()", desc: "Serialize column order/width/pin/hidden/align to a portable snapshot object." },
+    { signature: "table.applyLayoutSnapshot(snapshot)", desc: "Restore a previously captured layout snapshot." },
   ],
 };
 
@@ -146,6 +151,7 @@ const REACT_RETURN: Record<string, { signature: string; desc: string }[]> = {
     { signature: "computedColumnWidths", desc: "Record<colId, px> — the width to render for every column, always defined." },
     { signature: "setColumnWidth(colId, width), setColumnWidths(widths)", desc: "Set widths programmatically (e.g. a custom 'fit to content' action)." },
     { signature: "autoResizeAllColumns()", desc: "Fit-to-content sizing for every column." },
+    { signature: "resetColumnWidths()", desc: "Clears manual widths so computedColumnWidths goes back to filling the container proportionally." },
     { signature: "getHeaderProps(index, colId)", desc: "Spread onto a <th> — wires up native drag-to-reorder." },
     { signature: "getResizerProps(colId)", desc: "Spread onto a resize handle inside the header — guards against the ancestor's drag." },
     { signature: "isResizing", desc: "True while a resize drag is in progress." },
@@ -160,7 +166,15 @@ const REACT_RETURN: Record<string, { signature: string; desc: string }[]> = {
     { signature: "nextPage(), prevPage()", desc: "Pagination navigation helpers." },
   ],
   "Layout persistence": [
-    { signature: "saveLayout(), resetLayout(), hasSavedLayout()", desc: "Manual persistence controls (see autoPersist above for automatic)." },
+    { signature: "saveLayout(), resetLayout(), hasSavedLayout()", desc: "Save and reset column arrangement to/from localStorage. Handled automatically when autoPersist is true." },
+    { signature: "getLayoutSnapshot(), applyLayoutSnapshot(snapshot)", desc: "Export or restore column state snapshot objects directly." },
+  ],
+  "Core parity actions": [
+    { signature: "setGrouping, toggleGroup, expandAll, collapseAll", desc: "Row grouping controls for single and nested hierarchical grouping." },
+    { signature: "setSortColumns, addSort, removeSort", desc: "Multi-column priority sorting." },
+    { signature: "setAdvancedFilter, clearAdvancedFilter, clearAllAdvancedFilters", desc: "Filter with operators: equals, contains, between, inList, and 11 others." },
+    { signature: "startEdit, setEditingValue, saveEdit, cancelEdit, isEditing, onCellChange", desc: "Inline cell editing engine with validation." },
+    { signature: "reorderColumn(fromIndex, toIndex)", desc: "Programmatically move columns without drag-and-drop." },
   ],
 };
 
@@ -177,6 +191,7 @@ export default function DocsPage() {
 
           <div className="min-w-0">
             <DocsHero />
+            <MobileDocsNav />
             <DocsGuides />
             <DocsExample />
 
@@ -204,7 +219,7 @@ export default function DocsPage() {
               </div>
               <p className="text-[13.5px] leading-relaxed text-ink-faint">
                 All packages are published together under matching versions (currently{" "}
-                <span className="font-mono tabular-nums">0.0.8-beta.0</span>). MIT licensed, zero required dependencies in core.
+                <span className="font-mono tabular-nums">0.0.10</span>). MIT licensed, zero required dependencies in core.
               </p>
             </Section>
 
@@ -318,8 +333,14 @@ import '@liji-table/ui/styles.css';
                   new UniversalTable(data, columns, persistKey?, reservedWidth?)
                 </code>{" "}
                 mirrors the core engine with RxJS observables (<code className="font-mono text-[13px] text-ink">state$</code>,{" "}
-                <code className="font-mono text-[13px] text-ink">computedColumnWidths$</code>) for template binding, plus the
-                same actions and layout-persistence methods as core.
+                <code className="font-mono text-[13px] text-ink">computedColumnWidths$</code>) for reactive Angular template binding.
+                Includes full core parity: multi-sort, advanced filters, row grouping (<code className="font-mono text-[13px] text-ink">expandAll</code> / <code className="font-mono text-[13px] text-ink">collapseAll</code>),
+                inline cell editing, and layout persistence (<code className="font-mono text-[13px] text-ink">saveLayout</code> / <code className="font-mono text-[13px] text-ink">resetLayout</code>).
+              </p>
+              <p className="text-[14px] leading-relaxed text-ink-muted">
+                The <code className="font-mono text-[13px] text-ink">&lt;liji-table&gt;</code> component features a text-only
+                column context menu with Autosize All, Fill Container, Compact/Comfortable density toggle, Sort, Pin Left/Right,
+                Align, and Save/Reset Layout.
               </p>
               <div>
                 <p className="mb-2 text-[12px] font-medium uppercase tracking-wide text-ink-faint">
@@ -331,10 +352,23 @@ import '@liji-table/ui/styles.css';
                     { signature: "[height]: string", desc: "CSS height of the scroll container. Default '100%'." },
                     { signature: "[enableStriped]: boolean", desc: "Zebra-stripe rows." },
                     { signature: "[showCheckboxes]: boolean", desc: "Render a selection checkbox column." },
-                    { signature: "[showRowPin]: boolean", desc: "Render a 📌 button per row that pins it to the top." },
+                    { signature: "[showRowPin]: boolean", desc: "Render a pin action button per row that pins it to the top." },
                     { signature: "[showFilters]: boolean", desc: "Render per-column filter inputs in the header." },
-                    { signature: "[density]: 'standard' | 'compact' | 'comfortable'", desc: "Row height preset." },
+                    { signature: "[(density)]: 'standard' | 'compact' | 'comfortable'", desc: "Row height preset (supports two-way binding when toggled from context menu)." },
                     { signature: "[cellTemplates]: Record<string, TemplateRef>", desc: "Custom cell renderers keyed by column id." },
+                  ]}
+                />
+              </div>
+              <div>
+                <p className="mb-2 text-[12px] font-medium uppercase tracking-wide text-ink-faint">
+                  {"<liji-table-toolbar> inputs & outputs"}
+                </p>
+                <RefTable
+                  rows={[
+                    { signature: "[table]: UniversalTable", desc: "Required. The table instance to control (export, fit, fill, save/reset layout, column visibility)." },
+                    { signature: "[title]: string", desc: "Toolbar heading text. Default 'Table'." },
+                    { signature: "[density] / (densityChange)", desc: "Current row density and emitter when toggled." },
+                    { signature: "[showFilter] / (toggleFilter)", desc: "Filter row active state and toggle event emitter." },
                   ]}
                 />
               </div>
@@ -346,19 +380,47 @@ import '@liji-table/ui/styles.css';
                 for when you want a working table without writing the markup yourself. Import{" "}
                 <code className="font-mono text-[13px] text-ink">@liji-table/ui/styles.css</code> once, at your app root.
               </p>
-              <RefTable
-                rows={[
-                  { signature: "data, columns", desc: "Same shape as core. Omit if you pass tableInstance instead." },
-                  { signature: "tableInstance?", desc: "Pass an existing useLijiTable() result to control the table from outside." },
-                  { signature: "persistKey?", desc: "Enables 'Save Layout' / 'Reset Layout' in the column context menu." },
-                  { signature: "height?: string | number", desc: "Default '100%'." },
-                  { signature: "enableStriped?: boolean", desc: "Zebra-stripe rows." },
-                  { signature: "showCheckboxes?: boolean", desc: "Render a selection checkbox column." },
-                  { signature: "showRowPin?: boolean", desc: "Render a 📌 button per row that pins it to the top." },
-                  { signature: "showFilters?: boolean", desc: "Render per-column filter inputs." },
-                  { signature: "density?: 'standard' | 'compact' | 'comfortable'", desc: "Row height preset." },
-                ]}
-              />
+              <p className="text-[14px] leading-relaxed text-ink-muted">
+                Right-clicking a column header opens a text-only context menu with Autosize All, Fill Container,
+                Density toggle (Compact / Comfortable), Sort Asc/Desc, Pin Left/Right/Unpin, Align Left/Center/Right,
+                and Save/Reset Layout (when <code className="font-mono text-[13px] text-ink">persistKey</code> is passed) &mdash;
+                all wired straight to the corresponding core engine methods.
+              </p>
+              <p className="text-[14px] leading-relaxed text-ink-muted">
+                Tables render with crisp vertical grid borders (<code className="font-mono text-[13px] text-ink">border-right</code>)
+                and separate border spacing to keep sticky pinned columns and headers pixel-perfect while scrolling.
+              </p>
+              <div>
+                <p className="mb-2 text-[12px] font-medium uppercase tracking-wide text-ink-faint">
+                  {"<UniversalTable /> props"}
+                </p>
+                <RefTable
+                  rows={[
+                    { signature: "data, columns", desc: "Same shape as core. Omit if you pass tableInstance instead." },
+                    { signature: "tableInstance?", desc: "Pass an existing useLijiTable() result to control the table from outside." },
+                    { signature: "persistKey?", desc: "Enables 'Save Layout' / 'Reset Layout' in the column context menu." },
+                    { signature: "height?: string | number", desc: "Default '100%'." },
+                    { signature: "enableStriped?: boolean", desc: "Zebra-stripe rows." },
+                    { signature: "showCheckboxes?: boolean", desc: "Render a selection checkbox column." },
+                    { signature: "showRowPin?: boolean", desc: "Render a pin action button per row that pins it to the top." },
+                    { signature: "showFilters?: boolean", desc: "Render per-column filter inputs." },
+                    { signature: "density?: 'standard' | 'compact' | 'comfortable'", desc: "Row height preset (can also be toggled dynamically via column context menu)." },
+                  ]}
+                />
+              </div>
+              <div>
+                <p className="mb-2 text-[12px] font-medium uppercase tracking-wide text-ink-faint">
+                  {"<UniversalTableToolbar /> props"}
+                </p>
+                <RefTable
+                  rows={[
+                    { signature: "table", desc: "Required. The useLijiTable() hook return object." },
+                    { signature: "title?: string", desc: "Toolbar heading text. Default 'Table'." },
+                    { signature: "density?, onDensityChange?", desc: "Optional density state and change callback." },
+                    { signature: "showFilter?, onToggleFilter?", desc: "Optional filter row visibility state and toggle handler." },
+                  ]}
+                />
+              </div>
             </Section>
 
             <Section id="persistence" eyebrow="08" title="Layout persistence">
@@ -369,13 +431,237 @@ import '@liji-table/ui/styles.css';
               </p>
               <RefTable
                 rows={[
-                  { signature: "persistKey: string", desc: "Storage key. Required for saveLayout(), resetLayout(), hasSavedLayout(), and autoPersist." },
-                  { signature: "saveLayout()", desc: "Persist the current arrangement. Call after a resize/reorder/pin, or use autoPersist to skip this." },
-                  { signature: "resetLayout()", desc: "Clear storage and restore the original column arrangement passed to the constructor." },
-                  { signature: "hasSavedLayout()", desc: "Whether a saved layout exists for this key." },
-                  { signature: "getLayoutSnapshot() / applyLayoutSnapshot()", desc: "Core-level primitives if you want to persist somewhere other than localStorage." },
+                  { signature: "persistKey: string", desc: "Storage key in localStorage. Required for saveLayout(), resetLayout(), hasSavedLayout(), and autoPersist." },
+                  { signature: "autoPersist: boolean", desc: "When true, automatically updates localStorage whenever columns are resized, pinned, reordered, or hidden." },
+                  { signature: "saveLayout()", desc: "Explicitly persist the current arrangement to localStorage." },
+                  { signature: "resetLayout()", desc: "Clear storage and restore the initial default column definitions." },
+                  { signature: "hasSavedLayout()", desc: "Returns true if a saved layout currently exists in localStorage." },
+                  { signature: "getLayoutSnapshot() / applyLayoutSnapshot()", desc: "Core-level primitives to serialize or restore layouts to/from custom backends or databases." },
                 ]}
               />
+              <div className="mt-6">
+                <p className="mb-2 font-mono text-[13px] font-semibold text-ink">Automatic persistence with hook</p>
+                <Code>{`// Automatically saves column order, widths, pins, and hidden state on every change
+const table = useLijiTable(data, columns, {
+  persistKey: 'analytics-table',
+  autoPersist: true,
+});
+
+// Or trigger manual saves:
+<button onClick={() => table.saveLayout()}>Save Layout</button>
+<button onClick={() => table.resetLayout()}>Reset Layout</button>`}</Code>
+              </div>
+            </Section>
+
+            <Section id="pinning" eyebrow="09" title="Row & column pinning">
+              <p className="text-[14px] leading-relaxed text-ink-muted">
+                Both columns (<code className="font-mono text-[13px] text-ink">'left' | 'right' | null</code>) and rows (
+                <code className="font-mono text-[13px] text-ink">'top' | 'bottom' | null</code>) can be pinned using native CSS{" "}
+                <code className="font-mono text-[13px] text-ink">position: sticky</code>. Pinned rows remain visible across all
+                pages and outside the virtualization scroll window.
+              </p>
+              <Code>{`// 1. Pin or unpin a column (auto-reorders to edge unless reorder: false)
+table.pinColumn('id', 'left');
+table.pinColumn('actions', 'right');
+table.pinColumn('id', null); // restores to natural unpinned position
+
+// 2. Pin or unpin a row to top or bottom
+table.pinRow(row.id, 'top');
+table.pinRow(row.id, 'bottom');
+table.pinRow(row.id, null);
+
+// 3. Rendering sticky pinned rows in a custom table:
+{table.pinnedTopRows.map((row, idx) => (
+  <tr
+    key={row.id}
+    style={{ position: 'sticky', top: headerHeight + idx * rowHeight, zIndex: 5 }}
+  >
+    {/* cells */}
+  </tr>
+))}`}</Code>
+            </Section>
+
+            <Section id="virtualization" eyebrow="10" title="Row virtualization (100k+ rows)">
+              <p className="text-[14px] leading-relaxed text-ink-muted">
+                When rendering large datasets on a single page, bind{" "}
+                <code className="font-mono text-[13px] text-ink">onScroll</code> to your scroll container and render spacer{" "}
+                <code className="font-mono text-[13px] text-ink">&lt;tr&gt;</code> rows for{" "}
+                <code className="font-mono text-[13px] text-ink">virtualPaddingTop</code> and{" "}
+                <code className="font-mono text-[13px] text-ink">virtualPaddingBottom</code>. Only the visible window of rows
+                is mounted in the DOM.
+              </p>
+              <Code>{`<div
+  ref={table.containerRef}
+  onScroll={table.onScroll}
+  style={{ height: 560, overflow: 'auto' }}
+>
+  <table style={{ width: 'max-content', tableLayout: 'fixed' }}>
+    <thead>{/* header row */}</thead>
+    <tbody>
+      {table.virtualPaddingTop > 0 && (
+        <tr style={{ height: table.virtualPaddingTop }}>
+          <td colSpan={table.visibleColumns.length} style={{ padding: 0, border: 0 }} />
+        </tr>
+      )}
+
+      {table.virtualRows.map((row) => (
+        <tr key={row.id} style={{ height: 41 }}>
+          {table.visibleColumns.map((col) => (
+            <td key={col.id}>{row[col.id]}</td>
+          ))}
+        </tr>
+      ))}
+
+      {table.virtualPaddingBottom > 0 && (
+        <tr style={{ height: table.virtualPaddingBottom }}>
+          <td colSpan={table.visibleColumns.length} style={{ padding: 0, border: 0 }} />
+        </tr>
+      )}
+    </tbody>
+  </table>
+</div>`}</Code>
+            </Section>
+
+            <Section id="grouping" eyebrow="11" title="Row grouping & hierarchies">
+              <p className="text-[14px] leading-relaxed text-ink-muted">
+                Group rows by one or more columns with{" "}
+                <code className="font-mono text-[13px] text-ink">setGrouping(['category', 'region'])</code>. Use the{" "}
+                <code className="font-mono text-[13px] text-ink">isGroupRow(row)</code> type guard to distinguish expandable
+                group headers from leaf data rows.
+              </p>
+              <Code>{`import { useLijiTable, isGroupRow } from '@liji-table/react';
+
+// Enable nested grouping
+table.setGrouping(['category', 'supplier']);
+table.expandAll();   // recursively expands all levels
+table.collapseAll(); // collapses all groups
+
+// Rendering grouped rows:
+{table.rows.map((row) => {
+  if (isGroupRow(row)) {
+    return (
+      <tr key={row.groupKey} onClick={() => table.toggleGroup(row.groupKey)}>
+        <td colSpan={table.visibleColumns.length} style={{ paddingLeft: row.depth * 20 + 12 }}>
+          {row.expanded ? '▼' : '▶'} <strong>{String(row.groupValue)}</strong> ({row.count})
+        </td>
+      </tr>
+    );
+  }
+  return (
+    <tr key={row.id}>
+      {table.visibleColumns.map((col) => (
+        <td key={col.id}>{row[col.id]}</td>
+      ))}
+    </tr>
+  );
+})}`}</Code>
+            </Section>
+
+            <Section id="filtering" eyebrow="12" title="Advanced filtering & 15 operators">
+              <p className="text-[14px] leading-relaxed text-ink-muted">
+                Beyond global search (<code className="font-mono text-[13px] text-ink">setSearch</code>) and quick column text
+                filters (<code className="font-mono text-[13px] text-ink">setFilter</code>),{" "}
+                <code className="font-mono text-[13px] text-ink">setAdvancedFilter(colId, condition)</code> supports 15
+                built-in operators:
+              </p>
+              <RefTable
+                rows={[
+                  { signature: "'equals' | 'notEquals'", desc: "Exact match or inequality (case-insensitive by default unless caseSensitive: true)." },
+                  { signature: "'contains' | 'notContains'", desc: "Substring inclusion or exclusion." },
+                  { signature: "'startsWith' | 'endsWith'", desc: "Prefix or suffix match." },
+                  { signature: "'greaterThan' | 'lessThan'", desc: "Numeric or lexicographical comparison (> / <)." },
+                  { signature: "'greaterThanOrEqual' | 'lessThanOrEqual'", desc: "Inclusive numeric or lexicographical comparison (>= / <=)." },
+                  { signature: "'between'", desc: "Inclusive range check between condition.value and condition.value2." },
+                  { signature: "'inList'", desc: "Matches any item in condition.values array." },
+                  { signature: "'isEmpty' | 'isNotEmpty'", desc: "Checks for null, undefined, or empty string." },
+                  { signature: "'regex'", desc: "Evaluates condition.value as a regular expression (with case-insensitivity unless caseSensitive: true)." },
+                ]}
+              />
+              <Code>{`// Range filter (between $50 and $200)
+table.setAdvancedFilter('price', {
+  operator: 'between',
+  value: 50,
+  value2: 200,
+});
+
+// Multi-select list filter
+table.setAdvancedFilter('category', {
+  operator: 'inList',
+  values: ['Electronics', 'Furniture'],
+});
+
+// Clear one or all advanced filters
+table.clearAdvancedFilter('price');
+table.clearAllAdvancedFilters();`}</Code>
+            </Section>
+
+            <Section id="editing" eyebrow="13" title="Inline cell editing & validation">
+              <p className="text-[14px] leading-relaxed text-ink-muted">
+                Mark columns with <code className="font-mono text-[13px] text-ink">editable: true</code> and an optional{" "}
+                <code className="font-mono text-[13px] text-ink">validate</code> function. Subscribe to committed changes via{" "}
+                <code className="font-mono text-[13px] text-ink">onCellChange</code>.
+              </p>
+              <Code>{`const columns: TableColumn[] = [
+  {
+    id: 'price',
+    label: 'Price',
+    editable: true,
+    editor: 'number',
+    validate: (val) => (Number(val) > 0 ? true : 'Price must be positive'),
+  },
+];
+
+// Inside your <td> renderer:
+const editing = table.isEditing(row.id, col.id);
+return (
+  <td onDoubleClick={() => col.editable && table.startEdit(row.id, col.id)}>
+    {editing ? (
+      <input
+        autoFocus
+        value={table.state.editingCell?.value ?? ''}
+        onChange={(e) => table.setEditingValue(e.target.value)}
+        onBlur={() => table.saveEdit()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') table.saveEdit();
+          if (e.key === 'Escape') table.cancelEdit();
+        }}
+      />
+    ) : (
+      row[col.id]
+    )}
+  </td>
+);`}</Code>
+            </Section>
+
+            <Section id="theming" eyebrow="14" title="CSS theming & styling">
+              <p className="text-[14px] leading-relaxed text-ink-muted">
+                Both <code className="font-mono text-[13px] text-ink">@liji-table/ui</code> and{" "}
+                <code className="font-mono text-[13px] text-ink">@liji-table/angular</code> style their components through CSS
+                custom properties on <code className="font-mono text-[13px] text-ink">:root</code>. Override any variable in
+                your global stylesheet to match your brand or dark mode palette.
+              </p>
+              <RefTable
+                rows={[
+                  { signature: "--liji-border", desc: "Grid cell vertical and horizontal border color. Default '#cbd5e1'." },
+                  { signature: "--liji-bg / --liji-white", desc: "Header surface ('#f8f9fa') and body cell background ('#ffffff')." },
+                  { signature: "--liji-text-main / --liji-text-sub", desc: "Primary cell text ('#101828') and muted header/footer text ('#667085')." },
+                  { signature: "--liji-primary", desc: "Accent color for active sort, resize indicator, and focus rings ('#3b82f6')." },
+                  { signature: "--liji-pinned / --liji-pinned-header", desc: "Opaque surface fill for sticky pinned cells ('#eff1f5') and pinned headers ('#e5e8ef')." },
+                  { signature: "--liji-hover-row", desc: "Row hover highlight color ('#f9fafb')." },
+                ]}
+              />
+              <Code>{`/* Custom dark theme override */
+:root.dark {
+  --liji-bg: #0f172a;
+  --liji-white: #0b0f1c;
+  --liji-border: #1e293b;
+  --liji-text-main: #f1f5f9;
+  --liji-text-sub: #94a3b8;
+  --liji-primary: #38bdf8;
+  --liji-pinned: #161f33;
+  --liji-pinned-header: #1e293b;
+  --liji-hover-row: #131c31;
+}`}</Code>
             </Section>
           </div>
         </div>

@@ -2,36 +2,36 @@ import AmbientStars from "./AmbientStars";
 
 type Cell = { value: string; tone?: "yes" | "partial" | "no" };
 
-const ROWS: { label: string; liji: Cell; tanstack: Cell; agGrid: Cell }[] = [
+const ROWS: { label: string; liji: Cell; headless: Cell; fullFeatured: Cell }[] = [
   {
     label: "Pricing model",
     liji: { value: "Free (MIT)", tone: "yes" },
-    tanstack: { value: "Free (MIT)", tone: "yes" },
-    agGrid: { value: "Free core / paid Enterprise", tone: "partial" },
+    headless: { value: "Free (MIT)", tone: "yes" },
+    fullFeatured: { value: "Free core / paid Enterprise tier", tone: "partial" },
   },
   {
     label: "Rendering approach",
     liji: { value: "Headless, optional prebuilt UI", tone: "yes" },
-    tanstack: { value: "Headless", tone: "yes" },
-    agGrid: { value: "Batteries-included grid", tone: "partial" },
+    headless: { value: "Headless", tone: "yes" },
+    fullFeatured: { value: "Batteries-included grid", tone: "partial" },
   },
   {
     label: "Built-in virtualization",
     liji: { value: "Included", tone: "yes" },
-    tanstack: { value: "Separate package", tone: "partial" },
-    agGrid: { value: "Included", tone: "yes" },
+    headless: { value: "Often a separate package", tone: "partial" },
+    fullFeatured: { value: "Included", tone: "yes" },
   },
   {
     label: "First-party framework packages",
     liji: { value: "React, Angular", tone: "yes" },
-    tanstack: { value: "React, Vue, Solid, Svelte, Angular", tone: "yes" },
-    agGrid: { value: "React, Angular, Vue wrappers", tone: "yes" },
+    headless: { value: "Varies by library", tone: "partial" },
+    fullFeatured: { value: "React, Angular, Vue wrappers", tone: "yes" },
   },
   {
     label: "Layout persistence helper",
     liji: { value: "Built in (save/restore)", tone: "yes" },
-    tanstack: { value: "Bring your own", tone: "partial" },
-    agGrid: { value: "Built in (column state)", tone: "yes" },
+    headless: { value: "Bring your own", tone: "partial" },
+    fullFeatured: { value: "Built in (column state)", tone: "yes" },
   },
 ];
 
@@ -52,8 +52,8 @@ export default function Comparison() {
             Stated plainly, not oversold.
           </h2>
           <p className="mt-3 text-[15px] leading-relaxed text-ink-muted">
-            TanStack Table and AG Grid are both excellent, widely-used tools. Here&apos;s where Liji Table sits next to them,
-            structurally.
+            There are excellent, widely-used table libraries in both categories below. Here&apos;s where Liji Table
+            sits next to them, structurally.
           </p>
         </div>
 
@@ -65,8 +65,8 @@ export default function Comparison() {
                 <th className="border-b border-r border-grid-line bg-accent/5 p-4 text-left font-semibold text-ink">
                   liji-table
                 </th>
-                <th className="border-b border-r border-grid-line p-4 text-left font-medium text-ink-muted">tanstack table</th>
-                <th className="border-b border-grid-line p-4 text-left font-medium text-ink-muted">ag grid</th>
+                <th className="border-b border-r border-grid-line p-4 text-left font-medium text-ink-muted">typical headless libraries</th>
+                <th className="border-b border-grid-line p-4 text-left font-medium text-ink-muted">typical full-featured grids</th>
               </tr>
             </thead>
             <tbody>
@@ -76,8 +76,8 @@ export default function Comparison() {
                   <td className={`border-r border-grid-line bg-accent/5 p-4 font-medium ${toneClass(row.liji.tone)}`}>
                     {row.liji.value}
                   </td>
-                  <td className={`border-r border-grid-line p-4 ${toneClass(row.tanstack.tone)}`}>{row.tanstack.value}</td>
-                  <td className={`p-4 ${toneClass(row.agGrid.tone)}`}>{row.agGrid.value}</td>
+                  <td className={`border-r border-grid-line p-4 ${toneClass(row.headless.tone)}`}>{row.headless.value}</td>
+                  <td className={`p-4 ${toneClass(row.fullFeatured.tone)}`}>{row.fullFeatured.value}</td>
                 </tr>
               ))}
             </tbody>

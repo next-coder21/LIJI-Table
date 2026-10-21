@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-@custom-variant light (&:where(.light, .light *));
+@variant light (&:where(.light, .light *));
 
 /* Default = dark. Deep-space void is the brand's real identity now; .light
    is the "daylight observatory" opt-out. Accent = telemetry signal cyan,
@@ -25,6 +25,8 @@
   --radius-md: 8px;
 }
 
+:root.light,
+html.light,
 .light {
   --paper: #f6f7f9;
   --paper-raised: #ffffff;
@@ -38,11 +40,25 @@
   --accent: #0891b2;
   --accent-ink: #ffffff;
   --accent-2: #7c3aed;
-  --accent-amber: #f2a93b;
-  --accent-amber-ink: #2a1c02;
+  --accent-amber: #b45309;
+  --accent-amber-ink: #ffffff;
+
+  --color-paper: #f6f7f9;
+  --color-paper-raised: #ffffff;
+  --color-paper-raised-2: #eef0f3;
+  --color-ink: #0b1220;
+  --color-ink-muted: #5b6472;
+  --color-ink-faint: #8892a0;
+  --color-grid-line: #dee3ea;
+  --color-grid-line-strong: #c3cad5;
+  --color-accent: #0891b2;
+  --color-accent-ink: #ffffff;
+  --color-accent-2: #7c3aed;
+  --color-accent-amber: #b45309;
+  --color-accent-amber-ink: #ffffff;
 }
 
-@theme inline {
+@theme {
   --color-paper: var(--paper);
   --color-paper-raised: var(--paper-raised);
   --color-paper-raised-2: var(--paper-raised-2);
@@ -76,6 +92,9 @@ html {
 }
 html.light {
   color-scheme: light;
+}
+html.light .space-bg {
+  display: none !important;
 }
 
 body {

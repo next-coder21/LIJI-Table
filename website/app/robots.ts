@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://liji-table.example.com";
+export const dynamic = "force-static";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lijishwilson.in/liji-table";
 
 export default function robots(): MetadataRoute.Robots {
   return {

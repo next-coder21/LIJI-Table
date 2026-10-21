@@ -11,10 +11,10 @@ type Row = {
 };
 
 const ROWS: Row[] = [
-  { id: "01", pkg: "core", version: "0.0.8-beta.0", size: 12.1, tag: "beta" },
-  { id: "02", pkg: "react", version: "0.0.8-beta.0", size: 9.1, tag: "beta" },
-  { id: "03", pkg: "ui", version: "0.0.8-beta.0", size: 9.7, tag: "beta" },
-  { id: "04", pkg: "angular", version: "0.0.8-beta.0", size: 30.2, tag: "beta" },
+  { id: "01", pkg: "core", version: "0.0.10", size: 12.1, tag: "stable" },
+  { id: "02", pkg: "react", version: "0.0.10", size: 9.1, tag: "stable" },
+  { id: "03", pkg: "ui", version: "0.0.10", size: 9.7, tag: "stable" },
+  { id: "04", pkg: "angular", version: "0.0.10", size: 30.2, tag: "stable" },
 ];
 
 type SortDir = "asc" | "desc" | null;

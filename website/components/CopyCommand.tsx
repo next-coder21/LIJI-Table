@@ -19,17 +19,21 @@ export default function CopyCommand({ command }: { command: string }) {
     <button
       type="button"
       onClick={handleCopy}
-      className={`group flex w-full max-w-md items-center justify-between gap-3 rounded-sm border px-4 py-2.5 text-left font-mono text-[13px] text-ink transition-all ${
-        copied ? "border-accent shadow-[0_0_16px_-4px_var(--accent)]" : "border-grid-line hover:border-grid-line-strong"
-      } bg-paper-raised`}
+      aria-label={`Copy command to clipboard: ${command}`}
+      title={copied ? "Copied to clipboard" : `Copy: ${command}`}
+      className={`group flex w-full max-w-md items-center justify-between gap-3 rounded-sm border px-3.5 py-2.5 text-left font-mono text-[13px] text-ink transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+        copied
+          ? "border-accent bg-paper-raised shadow-[0_0_16px_-4px_var(--accent)]"
+          : "border-grid-line bg-paper-raised hover:border-grid-line-strong active:scale-[0.99]"
+      }`}
     >
-      <span className="truncate">
+      <span className="min-w-0 flex-1 truncate">
         <span className="select-none text-ink-faint">$ </span>
-        {command}
+        <span>{command}</span>
       </span>
       <span
-        className={`flex shrink-0 items-center gap-1 text-[11px] uppercase tracking-wide transition-colors ${
-          copied ? "text-accent" : "text-ink-faint group-hover:text-ink-muted"
+        className={`flex shrink-0 items-center gap-1.5 rounded-[3px] px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide transition-colors ${
+          copied ? "bg-accent/15 text-accent" : "bg-paper text-ink-faint group-hover:text-ink"
         }`}
       >
         <svg

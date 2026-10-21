@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LIJI Table Website
 
-## Getting Started
+Marketing site, documentation, live playground and changelog for [LIJI Table](https://github.com/next-coder21/LIJI-Table), the framework-agnostic data table for React, Angular and Vanilla JS.
 
-First, run the development server:
+Built with Next.js (App Router), React and Tailwind CSS, and deployed as a static export under `/liji-table`.
+
+## Pages
+
+| Route | Description |
+| --- | --- |
+| `/` | Landing page: hero, framework support, feature overview and comparison |
+| `/docs` | Full documentation with a searchable sidebar and a mobile docs menu |
+| `/playground` | Interactive playground to try the table live |
+| `/changelog` | Release history with an animated timeline |
+
+## What's new
+
+- **Expanded docs**: new sections for state persistence, row and column pinning, row virtualization (100k+ rows), row grouping, advanced filtering (all 15 operators), inline cell editing and validation, and CSS theming.
+- **Toolbar reference**: input/output and props tables for `<liji-table-toolbar>` (Angular) and `<UniversalTableToolbar />` (React).
+- **Changelog**: the latest release is expanded by default and older releases are collapsed. The timeline has a continuous line, a white dot that travels up it turning each version marker green, and a green pulsing marker for the latest release.
+- **Navigation**: the sidebar and mobile docs menu list every section, and the redundant "skip to main content" link has been removed.
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000/liji-table](http://localhost:3000/liji-table). Because the site uses `basePath: "/liji-table"`, every route is served under that prefix. To use another port, run `npx next dev -p 3001`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Start the development server |
+| `npm run build` | Create the static export in `out/` |
+| `npm run start` | Serve a production build |
 
-## Learn More
+## Project structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+website/
+├── app/            # Routes: home, docs, playground, changelog
+├── components/     # UI: Nav, DocsSidebar, ChangelogList, Playground, ...
+├── lib/            # Changelog parser and inline markdown renderer
+└── next.config.ts  # Static export + /liji-table base path
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Updating the changelog
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The changelog page reads the repository's root `CHANGELOG.md` at build time, so add a new release entry there and rebuild the site.
 
-## Deploy on Vercel
+## Deployment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`next.config.ts` sets `output: "export"`, so `npm run build` writes plain static files to `out/`. Serve that folder at `/liji-table/` (for example with an nginx `alias`). No Node server is needed.

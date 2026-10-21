@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://liji-table.example.com";
+export const dynamic = "force-static";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lijishwilson.in/liji-table";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
@@ -15,6 +17,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 0.9,
+    },
+    {
+      url: `${SITE_URL}/playground`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.8,
     },
     {
       url: `${SITE_URL}/changelog`,
