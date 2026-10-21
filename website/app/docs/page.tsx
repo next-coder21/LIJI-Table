@@ -58,7 +58,7 @@ const CORE_METHODS: Record<string, { signature: string; desc: string }[]> = {
   "Search & filtering": [
     { signature: "table.setSearch(query)", desc: "Global search across all columns." },
     { signature: "table.setFilter(colId, value)", desc: "Simple per-column text filter." },
-    { signature: "table.setAdvancedFilter(colId, condition)", desc: "Operator-based filter: equals, contains, between, inList, and 11 others." },
+    { signature: "table.setAdvancedFilter(colId, condition)", desc: "Operator-based filter: equals, contains, between, inList, and 10 others." },
     { signature: "table.clearAdvancedFilter(colId)", desc: "Remove one column's advanced filter." },
     { signature: "table.clearAllAdvancedFilters()", desc: "Remove every advanced filter." },
   ],
@@ -111,10 +111,7 @@ const CORE_METHODS: Record<string, { signature: string; desc: string }[]> = {
     { signature: "table.getCSVContent()", desc: "CSV string of exactly the currently visible columns." },
   ],
   "Layout persistence": [
-    { signature: "table.saveLayout(persistKey?)", desc: "Persist the current column order, widths, pin, hidden, and alignment to localStorage." },
-    { signature: "table.resetLayout(persistKey?)", desc: "Clear localStorage and revert columns to their original constructor definitions." },
-    { signature: "table.hasSavedLayout(persistKey?)", desc: "Check whether a saved layout exists in localStorage for this table." },
-    { signature: "table.getLayoutSnapshot()", desc: "Serialize column order/width/pin/hidden/align to a portable snapshot object." },
+    { signature: "table.getLayoutSnapshot()", desc: "Serialize column order/width/pin/hidden/align to a portable snapshot object. saveLayout(), resetLayout() and hasSavedLayout() (localStorage) are provided by the React hook and the Angular UniversalTable." },
     { signature: "table.applyLayoutSnapshot(snapshot)", desc: "Restore a previously captured layout snapshot." },
   ],
 };
@@ -172,7 +169,7 @@ const REACT_RETURN: Record<string, { signature: string; desc: string }[]> = {
   "Core parity actions": [
     { signature: "setGrouping, toggleGroup, expandAll, collapseAll", desc: "Row grouping controls for single and nested hierarchical grouping." },
     { signature: "setSortColumns, addSort, removeSort", desc: "Multi-column priority sorting." },
-    { signature: "setAdvancedFilter, clearAdvancedFilter, clearAllAdvancedFilters", desc: "Filter with operators: equals, contains, between, inList, and 11 others." },
+    { signature: "setAdvancedFilter, clearAdvancedFilter, clearAllAdvancedFilters", desc: "Filter with operators: equals, contains, between, inList, and 10 others." },
     { signature: "startEdit, setEditingValue, saveEdit, cancelEdit, isEditing, onCellChange", desc: "Inline cell editing engine with validation." },
     { signature: "reorderColumn(fromIndex, toIndex)", desc: "Programmatically move columns without drag-and-drop." },
   ],
@@ -352,7 +349,7 @@ import '@liji-table/ui/styles.css';
                     { signature: "[height]: string", desc: "CSS height of the scroll container. Default '100%'." },
                     { signature: "[enableStriped]: boolean", desc: "Zebra-stripe rows." },
                     { signature: "[showCheckboxes]: boolean", desc: "Render a selection checkbox column." },
-                    { signature: "[showRowPin]: boolean", desc: "Render a pin action button per row that pins it to the top." },
+                    { signature: "[showRowPin]: boolean", desc: "Enable row pinning: right-click a row to pin it to the top or bottom, or unpin it." },
                     { signature: "[showFilters]: boolean", desc: "Render per-column filter inputs in the header." },
                     { signature: "[(density)]: 'standard' | 'compact' | 'comfortable'", desc: "Row height preset (supports two-way binding when toggled from context menu)." },
                     { signature: "[cellTemplates]: Record<string, TemplateRef>", desc: "Custom cell renderers keyed by column id." },
@@ -402,7 +399,7 @@ import '@liji-table/ui/styles.css';
                     { signature: "height?: string | number", desc: "Default '100%'." },
                     { signature: "enableStriped?: boolean", desc: "Zebra-stripe rows." },
                     { signature: "showCheckboxes?: boolean", desc: "Render a selection checkbox column." },
-                    { signature: "showRowPin?: boolean", desc: "Render a pin action button per row that pins it to the top." },
+                    { signature: "showRowPin?: boolean", desc: "Enable row pinning: right-click a row to pin it to the top or bottom, or unpin it." },
                     { signature: "showFilters?: boolean", desc: "Render per-column filter inputs." },
                     { signature: "density?: 'standard' | 'compact' | 'comfortable'", desc: "Row height preset (can also be toggled dynamically via column context menu)." },
                   ]}
@@ -458,7 +455,7 @@ const table = useLijiTable(data, columns, {
                 Both columns (<code className="font-mono text-[13px] text-ink">'left' | 'right' | null</code>) and rows (
                 <code className="font-mono text-[13px] text-ink">'top' | 'bottom' | null</code>) can be pinned using native CSS{" "}
                 <code className="font-mono text-[13px] text-ink">position: sticky</code>. Pinned rows remain visible across all
-                pages and outside the virtualization scroll window.
+                pages and outside the virtualization scroll window. Row pinning is ignored while grouping is active.
               </p>
               <Code>{`// 1. Pin or unpin a column (auto-reorders to edge unless reorder: false)
 table.pinColumn('id', 'left');
@@ -488,7 +485,7 @@ table.pinRow(row.id, null);
                 <code className="font-mono text-[13px] text-ink">&lt;tr&gt;</code> rows for{" "}
                 <code className="font-mono text-[13px] text-ink">virtualPaddingTop</code> and{" "}
                 <code className="font-mono text-[13px] text-ink">virtualPaddingBottom</code>. Only the visible window of rows
-                is mounted in the DOM.
+                is mounted in the DOM. The hook assumes a fixed row height of 48px and renders 5 extra rows above and below the viewport.
               </p>
               <Code>{`<div
   ref={table.containerRef}
@@ -505,7 +502,7 @@ table.pinRow(row.id, null);
       )}
 
       {table.virtualRows.map((row) => (
-        <tr key={row.id} style={{ height: 41 }}>
+        <tr key={row.id} style={{ height: 48 }}>
           {table.visibleColumns.map((col) => (
             <td key={col.id}>{row[col.id]}</td>
           ))}
@@ -542,7 +539,7 @@ table.collapseAll(); // collapses all groups
     return (
       <tr key={row.groupKey} onClick={() => table.toggleGroup(row.groupKey)}>
         <td colSpan={table.visibleColumns.length} style={{ paddingLeft: row.depth * 20 + 12 }}>
-          {row.expanded ? '▼' : '▶'} <strong>{String(row.groupValue)}</strong> ({row.count})
+          {row.expanded ? '▼' : '▶'} <strong>{String(row.value)}</strong> ({row.leafCount})
         </td>
       </tr>
     );
@@ -557,24 +554,23 @@ table.collapseAll(); // collapses all groups
 })}`}</Code>
             </Section>
 
-            <Section id="filtering" eyebrow="12" title="Advanced filtering & 15 operators">
+            <Section id="filtering" eyebrow="12" title="Advanced filtering & 14 operators">
               <p className="text-[14px] leading-relaxed text-ink-muted">
                 Beyond global search (<code className="font-mono text-[13px] text-ink">setSearch</code>) and quick column text
                 filters (<code className="font-mono text-[13px] text-ink">setFilter</code>),{" "}
-                <code className="font-mono text-[13px] text-ink">setAdvancedFilter(colId, condition)</code> supports 15
+                <code className="font-mono text-[13px] text-ink">setAdvancedFilter(colId, condition)</code> supports 14
                 built-in operators:
               </p>
               <RefTable
                 rows={[
-                  { signature: "'equals' | 'notEquals'", desc: "Exact match or inequality (case-insensitive by default unless caseSensitive: true)." },
-                  { signature: "'contains' | 'notContains'", desc: "Substring inclusion or exclusion." },
-                  { signature: "'startsWith' | 'endsWith'", desc: "Prefix or suffix match." },
-                  { signature: "'greaterThan' | 'lessThan'", desc: "Numeric or lexicographical comparison (> / <)." },
-                  { signature: "'greaterThanOrEqual' | 'lessThanOrEqual'", desc: "Inclusive numeric or lexicographical comparison (>= / <=)." },
+                  { signature: "'equals' | 'notEquals'", desc: "Strict equality (===) or inequality (!==) against condition.value." },
+                  { signature: "'contains' | 'notContains'", desc: "Substring inclusion or exclusion (case-insensitive unless caseSensitive: true)." },
+                  { signature: "'startsWith' | 'endsWith'", desc: "Prefix or suffix match (case-insensitive unless caseSensitive: true)." },
+                  { signature: "'greaterThan' | 'lessThan'", desc: "Comparison with > / < against condition.value." },
+                  { signature: "'greaterThanOrEqual' | 'lessThanOrEqual'", desc: "Inclusive comparison with >= / <= against condition.value." },
                   { signature: "'between'", desc: "Inclusive range check between condition.value and condition.value2." },
-                  { signature: "'inList'", desc: "Matches any item in condition.values array." },
-                  { signature: "'isEmpty' | 'isNotEmpty'", desc: "Checks for null, undefined, or empty string." },
-                  { signature: "'regex'", desc: "Evaluates condition.value as a regular expression (with case-insensitivity unless caseSensitive: true)." },
+                  { signature: "'inList'", desc: "Matches when condition.value is an array that includes the cell value." },
+                  { signature: "'isEmpty' | 'isNotEmpty'", desc: "isEmpty matches null / undefined cells; isNotEmpty matches everything else." },
                 ]}
               />
               <Code>{`// Range filter (between $50 and $200)
@@ -587,7 +583,7 @@ table.setAdvancedFilter('price', {
 // Multi-select list filter
 table.setAdvancedFilter('category', {
   operator: 'inList',
-  values: ['Electronics', 'Furniture'],
+  value: ['Electronics', 'Furniture'],
 });
 
 // Clear one or all advanced filters
@@ -618,9 +614,9 @@ return (
     {editing ? (
       <input
         autoFocus
-        value={table.state.editingCell?.value ?? ''}
+        value={table.state.editingValue ?? ''}
         onChange={(e) => table.setEditingValue(e.target.value)}
-        onBlur={() => table.saveEdit()}
+        onBlur={() => table.saveEdit()} // returns false when validate() rejects
         onKeyDown={(e) => {
           if (e.key === 'Enter') table.saveEdit();
           if (e.key === 'Escape') table.cancelEdit();
@@ -635,10 +631,10 @@ return (
 
             <Section id="theming" eyebrow="14" title="CSS theming & styling">
               <p className="text-[14px] leading-relaxed text-ink-muted">
-                Both <code className="font-mono text-[13px] text-ink">@liji-table/ui</code> and{" "}
-                <code className="font-mono text-[13px] text-ink">@liji-table/angular</code> style their components through CSS
+                <code className="font-mono text-[13px] text-ink">@liji-table/ui</code> styles its components through CSS
                 custom properties on <code className="font-mono text-[13px] text-ink">:root</code>. Override any variable in
-                your global stylesheet to match your brand or dark mode palette.
+                your global stylesheet to match your brand or dark mode palette. The Angular component exposes{" "}
+                <code className="font-mono text-[13px] text-ink">liji-</code> prefixed class names that you can override in your global styles.
               </p>
               <RefTable
                 rows={[
@@ -646,7 +642,7 @@ return (
                   { signature: "--liji-bg / --liji-white", desc: "Header surface ('#f8f9fa') and body cell background ('#ffffff')." },
                   { signature: "--liji-text-main / --liji-text-sub", desc: "Primary cell text ('#101828') and muted header/footer text ('#667085')." },
                   { signature: "--liji-primary", desc: "Accent color for active sort, resize indicator, and focus rings ('#3b82f6')." },
-                  { signature: "--liji-pinned / --liji-pinned-header", desc: "Opaque surface fill for sticky pinned cells ('#eff1f5') and pinned headers ('#e5e8ef')." },
+                  { signature: "--liji-pinned / --liji-pinned-header", desc: "Opaque surface fill for sticky pinned cells ('#e6e8ee') and pinned headers ('#dde0e8')." },
                   { signature: "--liji-hover-row", desc: "Row hover highlight color ('#f9fafb')." },
                 ]}
               />

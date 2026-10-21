@@ -25,12 +25,18 @@ Provides enterprise-ready data table functionality for Angular 18+ applications.
 ## 🔄 What's New (v0.0.10)
 
 ### ✨ New Features
-- **Layout persistence** - pass a `persistKey` as the 3rd constructor argument (`new UniversalTable(data, columns, 'users-table')`) and the column arrangement auto-restores from `localStorage` on mount. Call `table.saveLayout()` / `table.resetLayout()` / `table.hasSavedLayout()`. The `<liji-table>` component shows "💾 Save Layout" / "♻ Reset Layout" in its column context menu automatically when `persistEnabled` is true.
-- **Auto-fit column widths** - un-resized columns proportionally fill the table's container by default (`computedColumnWidths$` / `getComputedColumnWidths()`); resizing one column via drag no longer shifts any other column. The `<liji-table>` component wires up a `ResizeObserver` on the scroll container automatically.
+- **Layout persistence** - pass a `persistKey` as the 3rd constructor argument (`new UniversalTable(data, columns, 'users-table')`) and the column arrangement auto-restores from `localStorage`. Call `table.saveLayout()` / `table.resetLayout()` / `table.hasSavedLayout()`. The `<liji-table>` column context menu shows "Save Layout" / "Reset Layout" automatically when `persistEnabled` is true.
+- **Density toggle in the column menu** - switch Compact / Comfortable from the right-click column menu. `<liji-table>` exposes `[(density)]` two-way binding.
+- **Full core parity** - `UniversalTable` exposes multi-column sorting, advanced filtering, row grouping, inline editing and layout snapshots (`getLayoutSnapshot` / `applyLayoutSnapshot`).
+- **Re-exported core types and helpers** from the public API.
 
 ### 🐛 Bug Fixes
-- Fixed `rows` / `virtualRows` typing to correctly reflect `(T | GroupRow<T>)[]` instead of `T[]`, and made `isAllPageSelected()` filter out group rows before checking selection - eliminates several strict-mode TypeScript errors.
-- Scoped `tsconfig.json` to `src` so `tsc` no longer picks up unrelated type errors from `node_modules`.
+- **Zero-shift column resizing** - `startResize` locks rendered header widths on `mousedown` and commits them atomically on `mouseup`.
+- **Header click sorting** - clicking a sortable header toggles sort without triggering on the resize handle; the context menu hides Sort Asc / Desc for `sortable: false` columns.
+- **Text-only context menu**, vertical grid lines and filter-row borders aligned to the column borders.
+- Controlled `[value]` binding on column filter inputs.
+- Uses `LijiTable` internally (no false deprecation warnings in the console).
+- `rows` / `virtualRows` are typed `(T | GroupRow<T>)[]`, and `isAllPageSelected()` ignores group rows.
 
 ---
 
@@ -54,6 +60,11 @@ Provides enterprise-ready data table functionality for Angular 18+ applications.
 - 🧲 **Column Pinning** - Pin columns left or right with context menu
 - ✅ **Row Selection** - Checkboxes with select-all
 - 🚀 **Virtualization** - Handle thousands of rows efficiently
+- 📌 **Row Pinning** - Right-click a row to pin it to the top or bottom (`[showRowPin]`)
+- 📊 **Row Grouping** - Nested grouping with expand / collapse
+- 🔎 **Advanced Filtering** - 14 operators per column
+- ✏️ **Inline Editing** - Editable columns with validation
+- 💾 **Layout Persistence** - Save and restore column order, width, pin, hidden and align
 - 📤 **CSV Export** - Export filtered data
 - 🎨 **Customization** - Cell templates, density modes, striped rows
 - ♿ **Accessible** - ARIA labels and roles
@@ -129,8 +140,39 @@ export class UsersTableComponent {
 | `enableStriped` | `boolean` | `false` | Zebra striping |
 | `showCheckboxes` | `boolean` | `false` | Row selection checkboxes |
 | `showFilters` | `boolean` | `false` | Column filter inputs |
-| `density` | `'standard' \| 'compact' \| 'comfortable'` | `'standard'` | Row density |
+| `showRowPin` | `boolean` | `false` | Right-click a row to pin it to the top or bottom |
+| `density` | `'standard' \| 'compact' \| 'comfortable'` | `'standard'` | Row density (supports `[(density)]` two-way binding) |
 | `cellTemplates` | `Record<string, TemplateRef>` | `{}` | Custom cell renderers |
+
+### Outputs
+
+| Output | Type | Description |
+|--------|------|-------------|
+| `densityChange` | `EventEmitter<'standard' \| 'compact' \| 'comfortable'>` | Emitted when density is toggled from the column context menu |
+
+### Column context menu
+Right-click a column header for: Autosize All, Fill Container, Compact / Comfortable, Sort Asc / Desc, Pin Left / Right / Unpin, Align Left / Center / Right, and Save / Reset Layout (when a `persistKey` was provided).
+
+### Toolbar (`<liji-table-toolbar>`)
+
+```html
+<liji-table-toolbar
+  [table]="table"
+  title="Users"
+  [(density)]="density"
+  [showFilter]="showFilters"
+  (toggleFilter)="showFilters = !showFilters">
+</liji-table-toolbar>
+```
+
+| Input / Output | Description |
+|----------------|-------------|
+| `[table]` | Required. The `UniversalTable` to control (export CSV, Fit, Fill, column visibility, Save / Reset layout) |
+| `[title]` | Heading text. Default `'Table'` |
+| `[density]` / `(densityChange)` | Current density and the emitter when its button is clicked |
+| `[showFilter]` / `(toggleFilter)` | Filter-row state and the toggle event |
+
+Save / Reset buttons only appear when the table has a `persistKey`.
 
 ---
 
@@ -208,6 +250,34 @@ this.table.toggleAllPage();
 
 // Export
 this.table.downloadCSV('users.csv');
+
+// Multi-column sorting
+this.table.setSortColumns([{ columnId: 'role', direction: 'asc' }, { columnId: 'name', direction: 'desc' }]);
+this.table.addSort('id', 'asc');
+this.table.removeSort('role');
+
+// Advanced filtering (equals, notEquals, contains, notContains, startsWith, endsWith,
+// greaterThan, lessThan, greaterThanOrEqual, lessThanOrEqual, between, inList, isEmpty, isNotEmpty)
+this.table.setAdvancedFilter('id', { operator: 'between', value: 1, value2: 100 });
+this.table.setAdvancedFilter('role', { operator: 'inList', value: ['Admin', 'Editor'] });
+this.table.clearAdvancedFilter('id');
+this.table.clearAllAdvancedFilters();
+
+// Row pinning (pinned rows stay on every page; ignored while grouping)
+this.table.pinRow(1, 'top');
+this.table.pinRow(1, null);
+
+// Row grouping (rows is typed (T | GroupRow<T>)[] - use isGroupRow to tell them apart)
+this.table.setGrouping(['role']);
+this.table.expandAll();
+this.table.collapseAll();
+
+// Inline editing (columns need editable: true and optionally editor / validate)
+this.table.onCellChange((rowId, columnId, newValue, oldValue) => console.log(rowId, columnId, newValue));
+this.table.startEdit(1, 'name');
+this.table.setEditingValue('Alicia');
+this.table.saveEdit();   // returns false when the column's validate() rejects the value
+this.table.cancelEdit();
 ```
 
 ### Layout Persistence
@@ -219,6 +289,10 @@ table = new UniversalTable(this.data, this.columns, 'users-table');
 this.table.saveLayout();       // persist current column order/width/pin/hidden/align
 this.table.resetLayout();      // clear saved layout, restore original columns
 this.table.hasSavedLayout();   // boolean
+
+// Or manage storage yourself
+const snapshot = this.table.getLayoutSnapshot();
+this.table.applyLayoutSnapshot(snapshot);
 ```
 
 ---

@@ -29,18 +29,18 @@ It provides a **polished table layout, toolbar, styles, and interactions**, whil
 This package includes:
 
 - 📊 **UniversalTable** – Fully functional table UI
-- 🧰 **UniversalTableToolbar** – Toolbar with export, density, filters, and column controls
+- 🧰 **UniversalTableToolbar** – Toolbar with export, density, filter toggle, Fit / Fill widths, layout save / reset and column visibility
 - 🎨 **Prebuilt styles (CSS)** – Clean, enterprise-grade design
-- 🧲 **Pinned columns** (left / right)
+- 🧲 **Pinned columns** (left / right) and **pinned rows** (top / bottom, via `showRowPin`)
 - ↔️ **Column resizing** (smooth, no lag)
 - 🧩 **Drag & drop column reordering**
 - 🔍 **Column filters + global filtering**
 - 📄 **Pagination footer**
 - ✅ **Row selection with checkboxes**
-- 📐 **Density modes** (standard / compact / comfortable)
+- 📐 **Density modes** (standard / compact / comfortable) – toggle Compact / Comfortable from the right-click column menu
 - 📤 **CSV export**
 - 📱 Scrollable + sticky headers
-- 💾 **Layout persistence** – "Save Layout" / "Reset Layout" in the column context menu (v0.0.10+)
+- 💾 **Layout persistence** – "Save Layout" / "Reset Layout" in the column context menu when `persistKey` is set
 - 📐 **Auto-fit column widths** – un-resized columns fill the container by default; resizing one never shifts another (v0.0.10+)
 
 ---
@@ -80,7 +80,8 @@ npm install @liji-table/ui @liji-table/react @liji-table/core
 | `density` | `standard \| compact \| comfortable` | Row density |
 | `showFilters` | `boolean` | Show column filter row |
 | `showCheckboxes` | `boolean` | Enable row selection |
-| `persistKey` | `string` | Enables "💾 Save Layout" / "♻ Reset Layout" in the column context menu, persisting column order/width/pin/hidden/align to `localStorage` under this key and auto-restoring it on mount |
+| `showRowPin` | `boolean` | Right-click a row to pin it to the top or bottom; pinned rows stay on every page |
+| `persistKey` | `string` | Enables "Save Layout" / "Reset Layout" in the column context menu, persisting column order/width/pin/hidden/align to `localStorage` under this key and auto-restoring it on mount |
 
 
 ## 🧰 UniversalTableToolbar
@@ -92,7 +93,8 @@ A separate, reusable toolbar component.
 - CSV Export
 - Density toggle
 - Filter toggle
-- Autosize columns
+- Fit (autosize to content) and Fill (fill the container)
+- Save / Reset layout (shown when the table has a `persistKey`)
 - Column visibility menu
 
 #### Example
@@ -108,6 +110,17 @@ import { UniversalTableToolbar } from "@liji-table/ui";
   density={density}
 />
 ```
+
+| Prop | Type | Description |
+|-----|------|-------------|
+| `table` | `any` | Required. The `useLijiTable()` result |
+| `title` | `string` | Heading text. Default `'Table'` |
+| `density` / `onDensityChange` | `standard \| compact \| comfortable` / callback | Current density and change handler |
+| `showFilter` / `onToggleFilter` | `boolean` / callback | Filter-row state and toggle handler |
+
+## 🖱 Column context menu
+
+Right-click a column header for: Autosize All, Fill Container, Compact / Comfortable, Sort Asc / Desc, Pin Left / Right / Unpin, Align Left / Center / Right, and Save / Reset Layout (when `persistKey` is set). Items are text-only; Sort items are hidden for `sortable: false` columns.
 
 ## 🎨 Styling
 
@@ -129,9 +142,44 @@ import "@liji-table/ui/styles.css";
 
 ### You can:
 
-- Override styles using CSS variables
+- Override styles using CSS variables (below)
 - Replace styles entirely
 - Use only logic without UI
+
+### CSS variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `--liji-border` | `#cbd5e1` | Grid border color (vertical and horizontal lines) |
+| `--liji-bg` / `--liji-white` | `#f8f9fa` / `#ffffff` | Header and body backgrounds |
+| `--liji-text-main` / `--liji-text-sub` | `#101828` / `#667085` | Primary and muted text |
+| `--liji-primary` | `#3b82f6` | Accent color (active sort, resize indicator, focus) |
+| `--liji-hover-row` | `#f9fafb` | Row hover background |
+| `--liji-pinned` / `--liji-pinned-header` | `#e6e8ee` / `#dde0e8` | Sticky pinned cell and header fill |
+
+```css
+:root.dark {
+  --liji-bg: #0f172a;
+  --liji-white: #0b0f1c;
+  --liji-border: #1e293b;
+  --liji-text-main: #f1f5f9;
+}
+```
+
+## 🧪 Advanced features via the hook
+
+`<UniversalTable />` renders sorting, filters, pagination, pinning, resizing and virtualization. Advanced filtering, row grouping and inline editing live in the underlying hook, so use `tableInstance` to drive them from your own UI:
+
+```tsx
+const table = useLijiTable(data, columns, { persistKey: 'users', autoPersist: true });
+
+table.setAdvancedFilter('price', { operator: 'between', value: 50, value2: 200 });
+table.setGrouping(['category']);
+
+<UniversalTable tableInstance={table} />
+```
+
+Virtualization is built in: only the rows in view are rendered (`virtualRows`), plus pinned rows. See [`@liji-table/react`](../react/README.md) for the full hook API.
 
 ## 📌 Column Features Supported
 

@@ -25,26 +25,26 @@ It provides all advanced table logic — sorting, filtering, pagination, column 
 ## 🔄 Recent Updates (v0.0.10)
 
 ### ✨ New Features
-- **Layout Persistence** - `getLayoutSnapshot()` captures the current column arrangement (order, hidden, pinned, align, widths) as a plain serializable object; `applyLayoutSnapshot(snapshot)` restores it, reordering/merging columns and leaving any columns not in the snapshot appended at the end. Framework packages (`react`, `angular`) build `localStorage` persistence on top of this.
-- **`computeAutoFitWidths(columns, columnWidths, containerWidth, reservedWidth?)`** - a pure, framework-agnostic function that computes the pixel width for every visible column: columns already present in `columnWidths` (i.e. manually resized) keep that exact value; any column not yet resized gets a proportional share of the remaining container width. This replaces relying on the browser's native `table-layout: fixed` leftover-redistribution, which used to spread any shortfall across *every* column on each reflow - including ones you'd just manually resized.
-- **`setColumnWidths(widths)`** - batch-set multiple column widths in a single state update/notify (used to "freeze" every column at the start of a resize drag).
+- **Recursive `expandAll()`** - expands every group key across single-level and multi-level `grouping` hierarchies.
+- **Multi-column sort inside groups** - `sortColumns` is now honored for the leaf rows inside grouped data (`groupData()`), matching the top-level sort priority.
 
 ### 🐛 Bug Fixes
-- Removed stale, out-of-sync compiled `.js`/`.d.ts` files that had been committed to `src/` alongside the current `.ts` source - these could get picked up instead of the real source by bundlers/test runners.
+- `setData(data)` clamps `pageIndex` when the new dataset has fewer pages than the active page, preventing an empty out-of-bounds view.
+- `getCSVContent()` writes `null` / `undefined` cells as empty strings instead of the literal text.
+- Added an `exports` map with explicit TypeScript `types` and `sideEffects: false` for modern bundlers.
 
 ### 🧪 Testing
-- ✅ All core tests passing, including new coverage for `computeAutoFitWidths` and layout persistence
+- ✅ Core test suite passing, including grouping and CSV coverage
+
+> Layout persistence to `localStorage` (`persistKey`, `saveLayout()`, `resetLayout()`) is provided by the `@liji-table/react` hook and the `@liji-table/angular` `UniversalTable`. Core exposes the serializable building blocks, `getLayoutSnapshot()` and `applyLayoutSnapshot()`.
 
 ---
 
 ## 📌 Why @liji-table/core?
 
-Most table libraries tightly couple **UI + logic**, making them:
-- Hard to customize
-- Hard to optimize
-- Framework-locked
+Tables that tightly couple **UI + logic** are hard to customize, hard to optimize and locked to one framework.
 
-`@liji-table/core` solves this by acting as a **headless table engine** that can be used with:
+`@liji-table/core` is a **headless table engine** that can be used with:
 - React
 - Angular
 - Vue
@@ -132,6 +132,97 @@ Framework bindings (like `@liji-table/react`) are thin wrappers around this core
 - Export filtered & sorted data
 - CSV generation without dependencies
 - Visible-column–aware export
+
+---
+
+## 🧩 Advanced Features
+
+### Multi-column sorting
+```ts
+table.setSortColumns([
+  { columnId: 'role', direction: 'asc' },
+  { columnId: 'name', direction: 'desc' },
+]);
+table.addSort('age', 'asc');      // add (pass `true` as 3rd arg to replace existing sorts)
+table.removeSort('role');
+```
+
+### Advanced filtering (14 operators)
+`setAdvancedFilter(columnId, condition)` takes a `FilterCondition` `{ operator, value, value2?, caseSensitive? }`.
+
+| Operator | Matches |
+|---|---|
+| `equals` / `notEquals` | Strict equality / inequality with `value` |
+| `contains` / `notContains` | Substring (case-insensitive unless `caseSensitive: true`) |
+| `startsWith` / `endsWith` | Prefix / suffix (case-insensitive unless `caseSensitive: true`) |
+| `greaterThan` / `lessThan` | `>` / `<` against `value` |
+| `greaterThanOrEqual` / `lessThanOrEqual` | `>=` / `<=` against `value` |
+| `between` | Inclusive range from `value` to `value2` |
+| `inList` | `value` is an array that includes the cell value |
+| `isEmpty` / `isNotEmpty` | Cell is (or is not) `null` / `undefined` |
+
+```ts
+table.setAdvancedFilter('price', { operator: 'between', value: 50, value2: 200 });
+table.setAdvancedFilter('category', { operator: 'inList', value: ['Books', 'Games'] });
+table.clearAdvancedFilter('price');
+table.clearAllAdvancedFilters();
+```
+
+### Row & column pinning
+```ts
+table.pinColumn('id', 'left');            // 'left' | 'right' | null (auto-reorders unless { reorder: false })
+table.pinRow(42, 'top');                  // 'top' | 'bottom' | null - shown on every page
+table.isRowPinned(42);                    // 'top' | 'bottom' | null
+const { top, bottom } = table.getPinnedRows();
+```
+Row pinning is ignored while grouping is active.
+
+### Row grouping
+```ts
+import { isGroupRow } from '@liji-table/core';
+
+table.setGrouping(['department', 'role']);   // nested, in order
+table.expandAll();
+table.collapseAll();
+
+for (const row of table.getRows()) {
+  if (isGroupRow(row)) {
+    // row.groupKey, row.value, row.depth, row.expanded, row.leafCount, row.children
+    table.toggleGroup(row.groupKey);
+  }
+}
+```
+
+### Inline editing & validation
+```ts
+const columns = [
+  {
+    id: 'price',
+    label: 'Price',
+    editable: true,
+    editor: 'number',   // 'text' | 'number' | 'date' | 'select' | 'checkbox' | 'custom'
+    validate: (value, row) => (Number(value) > 0 ? true : 'Price must be positive'),
+  },
+];
+
+table.onCellChange((rowId, columnId, newValue, oldValue) => save(rowId, columnId, newValue));
+table.startEdit(42, 'price');
+table.setEditingValue(19.99);
+table.saveEdit();     // returns false when `validate` rejects the value
+table.cancelEdit();
+```
+
+### Layout snapshots & auto-fit widths
+```ts
+const snapshot = table.getLayoutSnapshot();  // order, hidden, pinned, align, widths
+table.applyLayoutSnapshot(snapshot);
+
+table.setColumnWidths({ name: 240, email: 320 });
+table.resetColumnWidths();                   // back to filling the container
+const widths = computeAutoFitWidths(table.getState().columns, table.getState().columnWidths, containerWidth);
+```
+
+> Virtualization (`virtualRows`, `virtualPaddingTop`, `virtualPaddingBottom`) is provided by the framework bindings, not by the core engine.
 
 ---
 

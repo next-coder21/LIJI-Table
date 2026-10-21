@@ -137,9 +137,9 @@ npm install @liji-table/core
 ```
 
 ```javascript
-import { UniversalTableCore } from '@liji-table/core';
+import { LijiTable } from '@liji-table/core';
 
-const table = new UniversalTableCore(data, columns);
+const table = new LijiTable(data, columns);
 
 // Subscribe to state changes
 table.subscribe(state => {
@@ -152,23 +152,6 @@ table.setSearch('query');
 table.toggleSort('name');
 table.setPageSize(20);
 ```
-
-## 🎯 Why Choose Liji Table?
-
-### vs. TanStack Table
-- ✅ Framework-agnostic core (not just React/Vue/Solid)
-- ✅ Built-in virtualization (no external package needed)
-- ✅ Simpler API for common use cases
-
-### vs. AG Grid
-- ✅ Completely free and open source
-- ✅ Smaller bundle size (~12KB vs ~500KB)
-- ✅ Headless architecture for maximum flexibility
-
-### vs. React Table v7
-- ✅ Works with any framework
-- ✅ Built-in state management
-- ✅ Natural sort out of the box
 
 ## 📚 Documentation
 
@@ -185,19 +168,22 @@ All packages are thoroughly tested with Vitest:
 npm test
 ```
 
-**Current Test Status**: ✅ All 34 tests passing across `core`, `react`, and `angular`
+**Current Test Status**: ✅ All 65 tests passing across `core`, `react`, and `angular`
 
 ## 🔄 Recent Updates (v0.0.10)
 
+See [CHANGELOG.md](./CHANGELOG.md) for the full list.
+
 ### ✨ New Features
-- **Layout Persistence** - `saveLayout()` / `resetLayout()` / `hasSavedLayout()` on both the React hook and the Angular `UniversalTable` class, plus a `persistKey` option to auto-restore a saved column arrangement (order, width, pin, hidden, align) from `localStorage` on mount. The `@liji-table/ui` component and the Angular `<liji-table>` component both expose "💾 Save Layout" / "♻ Reset Layout" in the column context menu when `persistKey` is set.
-- **Deterministic Auto-Fit Column Widths** - new `computeAutoFitWidths()` in `@liji-table/core`. Columns you haven't manually resized proportionally fill the table's container by default; the moment you drag a resize handle, every other column is frozen at its current width so only the column you're dragging can change - no more sibling columns shifting mid-drag.
+- **Layout persistence** - `persistKey` / `autoPersist` options and `saveLayout()` / `resetLayout()` / `hasSavedLayout()` on the React hook and the Angular `UniversalTable` class. `@liji-table/ui` and `<liji-table>` show "Save Layout" / "Reset Layout" in the column context menu when `persistKey` is set. The core engine exposes `getLayoutSnapshot()` / `applyLayoutSnapshot()` for custom storage.
+- **Density toggle in the column menu** - Compact / Comfortable is now switched from the right-click column menu in `@liji-table/ui` and `<liji-table>` (Angular exposes `[(density)]`).
+- **Full core parity on the bindings** - the React hook and Angular `UniversalTable` expose multi-column sorting, advanced filters, row grouping, inline editing and layout snapshots.
+- **Recursive `expandAll()`** - expands every level of multi-level grouping.
 
 ### 🐛 Bug Fixes
-- `@liji-table/ui`'s virtualization was a no-op (rendered every row regardless of scroll position) - now actually windows rows via `virtualRows`.
-- `@liji-table/ui` previously shipped raw, uncompiled `.tsx` source, which broke on bundlers that don't transform `node_modules` (e.g. default CRA/webpack setups). It now ships a real compiled `dist` build.
-- Fixed stale/mismatched compiled `.js` files that had been committed alongside `.ts`/`.tsx` sources in `core` and `ui`, which could cause module resolution to pick up out-of-date code.
-- Fixed several Angular `strict` type errors around grouped rows (`T | GroupRow<T>`).
+- Zero-shift column resizing: only the column being dragged changes width.
+- Vertical grid lines and a text-only, compact context menu in `@liji-table/ui` and `<liji-table>`.
+- `setData()` clamps the page index when the new dataset has fewer pages, and `getCSVContent()` writes `null` / `undefined` cells as empty strings.
 
 ## 🛠️ Development
 
@@ -260,7 +246,7 @@ table.pinColumn('name', null);
 table.setGrouping(['department', 'role']);
 
 // Expand/collapse groups
-table.toggleGroup('Engineering');
+table.toggleGroup(groupRow.groupKey); // use the groupKey of a group row from table.getRows()
 table.expandAll();
 table.collapseAll();
 ```

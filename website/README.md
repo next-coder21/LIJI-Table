@@ -8,7 +8,7 @@ Built with Next.js (App Router), React and Tailwind CSS, and deployed as a stati
 
 | Route | Description |
 | --- | --- |
-| `/` | Landing page: hero, framework support, feature overview and comparison |
+| `/` | Landing page: hero, framework support, feature overview |
 | `/docs` | Full documentation with a searchable sidebar and a mobile docs menu |
 | `/playground` | Interactive playground to try the table live |
 | `/changelog` | Release history with an animated timeline |

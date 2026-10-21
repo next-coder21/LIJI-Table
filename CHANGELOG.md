@@ -10,8 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### @liji-table/core
 
 #### Added
-- **Layout persistence**: `saveLayout()`, `resetLayout()`, and `hasSavedLayout()` on `LijiTable`. Pass `persistKey` into constructor options to automatically restore column arrangements (order, width, pin, hidden, align) from `localStorage` on initialization.
-- `autoPersist` option to automatically persist layout changes to storage on column resize, reorder, visibility, or pin updates.
 - `expandAll()` - recursively traverses all configured grouping levels (`state.grouping`) and expands every group key across single-level and multi-level hierarchies.
 - Full multi-column sort (`sortColumns`) support inside grouped leaf rows in `groupData()`, matching top-level natural sort priority behavior.
 
