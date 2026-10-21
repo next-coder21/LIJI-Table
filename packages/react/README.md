@@ -378,3 +378,12 @@ applyLayoutSnapshot(snapshot)
 - Resize does not trigger React renders
 - Optimized for large datasets
 
+---
+
+## 📄 License
+
+MIT License
+
+---
+
+**Built by Lijish for developers who need powerful tables without the bloat**

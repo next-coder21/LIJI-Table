@@ -14,10 +14,21 @@
   "main": "dist/fesm2022/liji-table-angular.mjs",
   "module": "dist/fesm2022/liji-table-angular.mjs",
   "types": "dist/types/liji-table-angular.d.ts",
+  "typings": "dist/types/liji-table-angular.d.ts",
+  "exports": {
+    "./package.json": {
+      "default": "./package.json"
+    },
+    ".": {
+      "types": "./dist/types/liji-table-angular.d.ts",
+      "default": "./dist/fesm2022/liji-table-angular.mjs"
+    }
+  },
   "sideEffects": false,
   "license": "MIT",
   "files": [
-    "dist",
+    "dist/fesm2022",
+    "dist/types",
     "README.md",
     "LICENSE"
   ],
@@ -29,10 +40,11 @@
   "homepage": "https://github.com/next-coder21/LIJI-Table",
   "bugs": "https://github.com/next-coder21/LIJI-Table/issues",
   "scripts": {
-    "build": "ng-packagr -p ng-package.json"
+    "build": "node -e \"const fs=require('fs'),cp=require('child_process'),raw=fs.readFileSync('package.json','utf8'),pkg=JSON.parse(raw);delete pkg.exports;fs.writeFileSync('package.json',JSON.stringify(pkg,null,2)+'\\n');try{cp.execSync('npx ng-packagr -p ng-package.json',{stdio:'inherit'})}finally{fs.writeFileSync('package.json',raw);['package.json','README.md','LICENSE'].forEach(f=>fs.rmSync('dist/'+f,{force:true}))}\""
   },
   "dependencies": {
-    "@liji-table/core": "^0.0.10"
+    "@liji-table/core": "^0.0.10",
+    "tslib": "^2.3.0"
   },
   "peerDependencies": {
     "@angular/common": ">=17.0.0",

@@ -272,10 +272,25 @@ const rows = table.getRows();
 |--------|------------|
 | `pageIndex` | Current page index |
 | `pageSize` | Rows per page |
-| `searchQuery` | Global search query |
+| `globalSearch` | Global search query |
 | `filters` | Column-level filters |
 | `sortColumn` | Active sort column |
 | `sortDirection` | `asc` / `desc` / `null` |
 | `columnWidths` | Column width map |
 | `columns` | Column definitions |
 | `selectedIds` | Selected row IDs |
+| `sortColumns` | Multi-column sort priority list |
+| `advancedFilters` | Per-column operator-based filter conditions |
+| `pinnedRowIds` | `{ top, bottom }` pinned row IDs |
+| `grouping` / `expandedGroupIds` | Active group column IDs and expanded group keys |
+| `editingCell` / `editingValue` | Active inline-edited cell and current draft value |
+
+---
+
+## 📄 License
+
+MIT License
+
+---
+
+**Built by Lijish for developers who need powerful tables without the bloat**

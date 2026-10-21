@@ -236,3 +236,7 @@ You can:
 
 MIT License  
 Free for commercial and private use.
+
+---
+
+**Built by Lijish for developers who need powerful tables without the bloat**

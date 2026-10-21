@@ -78,7 +78,7 @@ npm install @liji-table/angular @liji-table/core
 ```
 
 **Requirements:**
-- Angular 18+
+- Angular 17+
 - RxJS 7+
 - TypeScript 5+
 
@@ -345,4 +345,4 @@ MIT License - Free for commercial and private use
 
 ---
 
-**Built for Angular developers who need enterprise-grade tables**
+**Built by Lijish for developers who need powerful tables without the bloat**
