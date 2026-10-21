@@ -5,7 +5,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
+    "build": "npm run build --workspace=@liji-table/core && npm run build --workspace=@liji-table/react && npm run build --workspace=@liji-table/ui && npm run build --workspace=@liji-table/angular",
     "test": "vitest"
   },
   "devDependencies": {

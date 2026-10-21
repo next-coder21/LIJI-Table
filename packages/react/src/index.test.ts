@@ -189,4 +189,18 @@ describe('useUniversalTable (React Hook)', () => {
             expect(result.current.virtualRows.some((r: any) => r.id === 0)).toBe(false); // not duplicated into the scrollable window
         });
     });
+
+    describe('v0.0.10 full core parity', () => {
+        it('includes data-col-id in getHeaderProps and exposes grouping, multi-sort, advanced filter, and editing methods', () => {
+            const { result } = renderHook(() => useUniversalTable(mockData, mockColumns));
+            const headerProps = result.current.getHeaderProps(0, 'name');
+            expect(headerProps['data-col-id']).toBe('name');
+
+            expect(typeof result.current.setSortColumns).toBe('function');
+            expect(typeof result.current.setAdvancedFilter).toBe('function');
+            expect(typeof result.current.setGrouping).toBe('function');
+            expect(typeof result.current.expandAll).toBe('function');
+            expect(typeof result.current.startEdit).toBe('function');
+        });
+    });
 });

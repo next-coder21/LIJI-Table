@@ -1,10 +1,37 @@
 {
   "name": "@liji-table/core",
-  "version": "0.0.9",
+  "version": "0.0.10",
+  "description": "Zero-dependency, framework-agnostic headless table engine with natural sort, multi-column sort, advanced filtering, row/column pinning, grouping, inline editing, and auto-fit column widths.",
+  "keywords": [
+    "table",
+    "datagrid",
+    "headless-table",
+    "virtualization",
+    "typescript",
+    "liji-table"
+  ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
   "license": "MIT",
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/next-coder21/LIJI-Table.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/next-coder21/LIJI-Table",
+  "bugs": "https://github.com/next-coder21/LIJI-Table/issues",
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w"

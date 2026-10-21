@@ -1,20 +1,43 @@
 {
   "name": "@liji-table/angular",
-  "version": "0.0.9",
+  "version": "0.0.10",
+  "description": "Angular standalone components (<liji-table>, <liji-table-toolbar>) and RxJS-powered UniversalTable adapter for @liji-table/core.",
+  "keywords": [
+    "angular",
+    "angular-table",
+    "datagrid",
+    "rxjs",
+    "virtualization",
+    "liji-table"
+  ],
   "type": "module",
   "main": "dist/fesm2022/liji-table-angular.mjs",
   "module": "dist/fesm2022/liji-table-angular.mjs",
   "types": "dist/types/liji-table-angular.d.ts",
   "sideEffects": false,
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/next-coder21/LIJI-Table.git",
+    "directory": "packages/angular"
+  },
+  "homepage": "https://github.com/next-coder21/LIJI-Table",
+  "bugs": "https://github.com/next-coder21/LIJI-Table/issues",
   "scripts": {
     "build": "ng-packagr -p ng-package.json"
   },
   "dependencies": {
-    "@liji-table/core": "*"
+    "@liji-table/core": "^0.0.10"
   },
   "peerDependencies": {
     "@angular/common": ">=17.0.0",
-    "@angular/core": ">=17.0.0"
+    "@angular/core": ">=17.0.0",
+    "rxjs": ">=7.0.0"
   },
   "devDependencies": {
     "@angular/common": "^21.0.0",

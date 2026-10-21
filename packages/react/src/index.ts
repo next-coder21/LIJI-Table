@@ -11,8 +11,29 @@ import {
   CellEditorType,
   CellValidator,
   LayoutSnapshot,
+  GroupRow,
+  isGroupRow,
   computeAutoFitWidths
 } from '@liji-table/core';
+
+export {
+  LijiTable,
+  isGroupRow,
+  computeAutoFitWidths
+};
+export type {
+  TableState,
+  TableColumn,
+  ColumnAlign,
+  SortDirection,
+  SortEntry,
+  FilterOperator,
+  FilterCondition,
+  CellEditorType,
+  CellValidator,
+  LayoutSnapshot,
+  GroupRow
+};
 
 const LAYOUT_STORAGE_PREFIX = 'liji-table:layout:';
 
@@ -163,11 +184,17 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
   // element that wraps the table.
   const containerRef = useRef<HTMLElement | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const [isResizing, setIsResizing] = useState(false);
+  const isResizingRef = useRef(false);
 
   useLayoutEffect(() => {
     const node = containerRef.current;
     if (!node) return;
-    const update = () => setContainerWidth(node.clientWidth);
+    const update = () => {
+      if (isResizingRef.current) return;
+      const w = node.clientWidth;
+      if (w > 0) setContainerWidth(w);
+    };
     update();
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(update);
@@ -181,8 +208,6 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
   );
 
   // --- 6. RESIZE LOGIC (Headless & Performance Optimized) ---
-  const [isResizing, setIsResizing] = useState(false);
-
   // We use direct DOM manipulation for the drag to avoid React render lag
   const getResizerProps = (colId: string) => ({
     // Consumers commonly render this handle inside a `getHeaderProps` <th>
@@ -197,60 +222,83 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
     onMouseDown: (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      isResizingRef.current = true;
       setIsResizing(true);
       document.body.style.cursor = 'col-resize';
 
       const startX = e.pageX;
 
       // CRITICAL: Get the parent <TH> element to resize it directly
-      const headerNode = (e.currentTarget as HTMLElement).closest('th');
+      const headerNode = (e.currentTarget as HTMLElement).closest('th') as HTMLTableCellElement | null;
       if (!headerNode) return;
+      const tableNode = headerNode.closest('table');
 
-      // 🧊 FREEZE: every column not yet in `columnWidths` is "auto" and
-      // proportionally fills the container by default (computedColumnWidths
-      // above). The instant a resize drag starts, commit every column's
-      // CURRENT computed width into `columnWidths` - converting them all to
-      // "manual" at their present size - so that only the column being
-      // dragged can change from here on. The table's total width simply
-      // grows/shrinks with it (the scroll wrapper handles overflow); no
-      // other column is ever recomputed as a side effect of this one drag.
-      const frozenWidths: Record<string, number> = {};
-      state.columns.forEach((c) => {
-        if (state.columnWidths[c.id] == null) {
-          frozenWidths[c.id] = computedColumnWidths[c.id];
-        }
-      });
-      if (Object.keys(frozenWidths).length > 0) {
-        table.setColumnWidths(frozenWidths);
+      // 1. Force the table element itself to fixed layout and definite 0px base width
+      // (in CSS, width: max-content disables table-layout: fixed and falls back to auto!).
+      // With width: 0px + table-layout: fixed, table width is strictly the sum of column widths.
+      if (tableNode) {
+        tableNode.style.tableLayout = 'fixed';
+        tableNode.style.width = '0px';
+        tableNode.style.minWidth = '0px';
       }
 
-      // Start from the column's current computed width (not a stale
-      // default), so there's no jump the instant the drag begins.
-      const startWidth = computedColumnWidths[colId] ?? headerNode.getBoundingClientRect().width;
+      // 2. 🔒 FREEZE directly in DOM from actual rendered dimensions:
+      // Lock every header's current rendered pixel width right now so the browser
+      // layout engine cannot shrink or stretch any sibling headers (left or right)
+      // while the user drags this handle, and so there is 0px jump on mousedown.
+      const frozenWidths: Record<string, number> = { ...computedColumnWidths, ...state.columnWidths };
+      if (tableNode) {
+        const allThs = tableNode.querySelectorAll<HTMLTableCellElement>('thead tr:first-child th');
+        allThs.forEach((th) => {
+          const colIdAttr = th.getAttribute('data-col-id');
+          const currentW = Math.round(th.getBoundingClientRect().width);
+          if (currentW > 0) {
+            if (colIdAttr) frozenWidths[colIdAttr] = currentW;
+            th.style.width = `${currentW}px`;
+            th.style.minWidth = `${currentW}px`;
+            th.style.maxWidth = `${currentW}px`;
+          }
+        });
+      }
+
+      // Start from the column's actual rendered width so there's zero jump when the drag begins.
+      const startWidth = frozenWidths[colId] ?? Math.round(headerNode.getBoundingClientRect().width);
 
       const onMouseMove = (moveEvent: MouseEvent) => {
         if (!headerNode) return;
 
         // Calculate new width
         const diff = moveEvent.pageX - startX;
-        const newWidth = Math.max(50, startWidth + diff);
+        const newWidth = Math.max(50, Math.round(startWidth + diff));
 
-        // 🚀 DIRECT DOM UPDATE: No React State lag here!
+        // 🚀 DIRECT DOM UPDATE: Only the dragged column changes!
         headerNode.style.width = `${newWidth}px`;
+        headerNode.style.minWidth = `${newWidth}px`;
+        headerNode.style.maxWidth = `${newWidth}px`;
       };
 
       const onMouseUp = (upEvent: MouseEvent) => {
         const diff = upEvent.pageX - startX;
-        const newWidth = Math.max(50, startWidth + diff);
+        const newWidth = Math.max(50, Math.round(startWidth + diff));
 
-        // 💾 COMMIT: Now we tell React/Core about the new width
-        table.setColumnWidth(colId, newWidth);
+        // Clear temporary minWidth/maxWidth locks on all th elements
+        if (tableNode) {
+          const allThs = tableNode.querySelectorAll<HTMLTableCellElement>('thead tr:first-child th');
+          allThs.forEach((th) => {
+            th.style.minWidth = '';
+            th.style.maxWidth = '';
+          });
+        }
 
         // Cleanup
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
         document.body.style.cursor = 'default';
+        isResizingRef.current = false;
         setIsResizing(false);
+
+        // 💾 COMMIT: Commit all frozen widths + the dragged column's new width in one update
+        table.setColumnWidths({ ...frozenWidths, [colId]: newWidth });
       };
 
       document.addEventListener('mousemove', onMouseMove);
@@ -260,6 +308,7 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
 
   // --- 6. DRAG & DROP LOGIC ---
   const getHeaderProps = (index: number, colId: string) => ({
+    'data-col-id': colId,
     draggable: !isResizing, // Disable drag when resizing
     onDragStart: (e: React.DragEvent) => {
       e.dataTransfer.setData('colIndex', index.toString());
@@ -349,9 +398,32 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
     setPageSize: (s: number) => table.setPageSize(s),
     exportData: () => table.getAllFilteredRows(),
 
-    // Sort
+    // Sort (Single & Multi-Column)
     toggleSort: (colId: string) => table.toggleSort(colId),
     setSortDirection: (colId: string, dir: SortDirection) => table.setSortDirection(colId, dir),
+    setSortColumns: (sorts: SortEntry[]) => table.setSortColumns(sorts),
+    addSort: (colId: string, dir: 'asc' | 'desc') => table.addSort(colId, dir),
+    removeSort: (colId: string) => table.removeSort(colId),
+
+    // Advanced Filters
+    setAdvancedFilter: (colId: string, condition: FilterCondition) => table.setAdvancedFilter(colId, condition),
+    clearAdvancedFilter: (colId: string) => table.clearAdvancedFilter(colId),
+    clearAllAdvancedFilters: () => table.clearAllAdvancedFilters(),
+
+    // Row Grouping
+    setGrouping: (colIds: string[]) => table.setGrouping(colIds),
+    toggleGroup: (groupKey: string) => table.toggleGroup(groupKey),
+    expandAll: () => table.expandAll(),
+    collapseAll: () => table.collapseAll(),
+
+    // Inline Cell Editing
+    startEdit: (rowId: string | number, colId: string) => table.startEdit(rowId, colId),
+    setEditingValue: (val: any) => table.setEditingValue(val),
+    saveEdit: () => table.saveEdit(),
+    cancelEdit: () => table.cancelEdit(),
+    isEditing: (rowId: string | number, colId: string) => table.isEditing(rowId, colId),
+    onCellChange: (cb: (rowId: string | number, columnId: string, newValue: any, oldValue: any) => void) => table.onCellChange(cb),
+
     downloadCSV: (fileName: string = 'export.csv') => {
       const csvContent = table.getCSVContent();
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -374,8 +446,12 @@ export function useLijiTable<T extends { id: any }>(data: T[], initialColumns: T
 
     // Features
     toggleVisibility: (colId: string) => table.toggleVisibility(colId),
-    toggleSelection: (id: number) => table.toggleSelection(id),
+    toggleSelection: (id: string | number) => table.toggleSelection(id),
     toggleAllPage: () => table.toggleAllPage(),
+    reorderColumn: (fromIndex: number, toIndex: number) => table.reorderColumn(fromIndex, toIndex),
+    getLayoutSnapshot: () => table.getLayoutSnapshot(),
+    applyLayoutSnapshot: (snapshot: LayoutSnapshot) => table.applyLayoutSnapshot(snapshot),
+    table,
 
     isAllPageSelected: () => {
       const rows = table.getRows();
@@ -450,7 +526,7 @@ export function useUniversalTable<T extends { id: any }>(data: T[], initialColum
       console.warn(
         '[Liji Table] useUniversalTable is deprecated. Please use useLijiTable instead. ' +
         'This alias will be removed in v2.0.0. ' +
-        'See migration guide: https://github.com/yourrepo/liji-table#migration'
+        'See migration guide: https://github.com/next-coder21/LIJI-Table#migration'
       );
     }
   }, []);

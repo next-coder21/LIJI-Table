@@ -18,7 +18,7 @@ export const UniversalTableToolbar: React.FC<ToolbarProps> = ({
   onToggleFilter,
   showFilter = false
 }) => {
-  const { downloadCSV, autoResizeAllColumns, resetColumnWidths, allColumns, toggleVisibility } = table;
+  const { downloadCSV, autoResizeAllColumns, resetColumnWidths, allColumns, toggleVisibility, saveLayout, resetLayout } = table;
   
   // Local state for the "Cols" dropdown menu
   const [showColMenu, setShowColMenu] = useState(false);
@@ -66,13 +66,24 @@ export const UniversalTableToolbar: React.FC<ToolbarProps> = ({
         
         {/* 1. Fit / Autosize (fit-to-content: can leave empty space if the container is wider) */}
         <button onClick={() => autoResizeAllColumns()} className="liji-btn-page" title="Fit each column to its content (may leave empty space)">
-            <span>⟷</span> Fit
+            Fit
         </button>
 
         {/* 1b. Fill (clears manual widths so columns proportionally fill the container) */}
         <button onClick={() => resetColumnWidths()} className="liji-btn-page" title="Clear manual widths and fill the container">
-            <span>⤢</span> Fill
+            Fill
         </button>
+
+        {saveLayout && (
+          <>
+            <button onClick={() => saveLayout()} className="liji-btn-page" title="Save current column layout to localStorage">
+              Save
+            </button>
+            <button onClick={() => resetLayout()} className="liji-btn-page" title="Reset column layout to default">
+              Reset
+            </button>
+          </>
+        )}
 
         {/* 2. Column Visibility Menu */}
         <div style={{ position: 'relative' }}>
@@ -84,8 +95,8 @@ export const UniversalTableToolbar: React.FC<ToolbarProps> = ({
             <div className="liji-context-menu" onClick={(e) => e.stopPropagation()} style={{ top: 35, right: 0 }}>
               <div className="liji-menu-header">Visible Columns</div>
               {allColumns.map((col: any) => (
-                <div key={col.id} className="liji-menu-item">
-                  <input type="checkbox" checked={!col.hidden} onChange={() => toggleVisibility(col.id)} />
+                <div key={col.id} className="liji-menu-item" onClick={() => toggleVisibility(col.id)}>
+                  <input type="checkbox" checked={!col.hidden} onChange={() => toggleVisibility(col.id)} onClick={(e) => e.stopPropagation()} />
                   <span>{col.label}</span>
                 </div>
               ))}

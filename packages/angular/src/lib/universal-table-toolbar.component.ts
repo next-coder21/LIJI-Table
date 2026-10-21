@@ -24,16 +24,21 @@ import { UniversalTable } from './universal-table';
 
         <div class="liji-divider-vertical" style="width:1px; height:20px; background:#eaecf0; margin:0 4px"></div>
 
-        <button class="liji-btn-page" title="Fit each column to its content (may leave empty space)" (click)="table.autoResizeAllColumns()"><span>⟷</span> Fit</button>
-        <button class="liji-btn-page" title="Clear manual widths and fill the container" (click)="table.resetColumnWidths()"><span>⤢</span> Fill</button>
+        <button class="liji-btn-page" title="Fit each column to its content (may leave empty space)" (click)="table.autoResizeAllColumns()">Fit</button>
+        <button class="liji-btn-page" title="Clear manual widths and fill the container" (click)="table.resetColumnWidths()">Fill</button>
+
+        <ng-container *ngIf="table.persistEnabled">
+          <button class="liji-btn-page" title="Save current column layout to localStorage" (click)="table.saveLayout()">Save</button>
+          <button class="liji-btn-page" title="Reset column layout to default" (click)="table.resetLayout()">Reset</button>
+        </ng-container>
 
         <div style="position: relative;">
           <button class="liji-btn-page" (click)="showColMenu = !showColMenu"><span>👁</span> Cols</button>
           
           <div *ngIf="showColMenu" class="liji-context-menu" style="top:35px; right:0" (click)="$event.stopPropagation()">
              <div class="liji-menu-header">Visible Columns</div>
-             <div *ngFor="let col of table.allColumns" class="liji-menu-item">
-               <input type="checkbox" [checked]="!col.hidden" (change)="table.toggleVisibility(col.id)">
+             <div *ngFor="let col of table.allColumns" class="liji-menu-item" (click)="table.toggleVisibility(col.id)">
+               <input type="checkbox" [checked]="!col.hidden" (change)="table.toggleVisibility(col.id)" (click)="$event.stopPropagation()">
                <span>{{ col.label }}</span>
              </div>
           </div>

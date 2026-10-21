@@ -5,6 +5,67 @@ All notable changes to Liji Table will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.10] - 2026-10-20
+
+### @liji-table/core
+
+#### Added
+- **Layout persistence**: `saveLayout()`, `resetLayout()`, and `hasSavedLayout()` on `LijiTable`. Pass `persistKey` into constructor options to automatically restore column arrangements (order, width, pin, hidden, align) from `localStorage` on initialization.
+- `autoPersist` option to automatically persist layout changes to storage on column resize, reorder, visibility, or pin updates.
+- `expandAll()` - recursively traverses all configured grouping levels (`state.grouping`) and expands every group key across single-level and multi-level hierarchies.
+- Full multi-column sort (`sortColumns`) support inside grouped leaf rows in `groupData()`, matching top-level natural sort priority behavior.
+
+#### Fixed
+- `setData(data)` now clamps `state.pageIndex` when the new dataset has fewer pages than the previously active page index, preventing empty out-of-bounds views.
+- `getCSVContent()` now normalizes `null` and `undefined` cell values to `""` instead of outputting `undefined` or `null` literals.
+- Added `exports` map with explicit TypeScript `types` resolution and `sideEffects: false` for modern bundlers on npmjs.com.
+
+### @liji-table/react
+
+#### Added
+- **Layout persistence on hook**: exposed `saveLayout`, `resetLayout`, and `hasSavedLayout` on `useLijiTable` with `persistKey` and `autoPersist` options.
+- **Compact density in dropdown**: moved the density toggle (`Compact` / `Comfortable`) off the top toolbar directly into the right-click column context menu for a cleaner toolbar and instant density switching.
+- Full Core API parity on `useLijiTable`: exposed `setSortColumns`, `addSort`, `removeSort`, `setAdvancedFilter`, `clearAdvancedFilter`, `clearAllAdvancedFilters`, `setGrouping`, `toggleGroup`, `expandAll`, `collapseAll`, `startEdit`, `setEditingValue`, `saveEdit`, `cancelEdit`, `isEditing`, `onCellChange`, `reorderColumn`, `getLayoutSnapshot`, `applyLayoutSnapshot`, and `table`.
+- Re-exported all core TypeScript interfaces and helpers (`LijiTable`, `isGroupRow`, `computeAutoFitWidths`, `TableState`, `TableColumn`, `FilterCondition`, `GroupRow`, etc.) directly from `@liji-table/react`.
+
+#### Fixed
+- **Table grid vertical lines**: added crisp `border-right: 1px solid #cbd5e1` across all header and body cells, framing the grid cleanly and eliminating invisible column boundaries.
+- **Context menu ergonomics & sizing**: cleaned up all right-click menu items to text-only (removed emoji/symbol icons like `💾`, `♻`, `📌`, `⟷`, `⤢`, `↑`, `↓`), reduced item padding from `0.75rem 1rem` to `6px 14px`, and applied compact `13px` typography to prevent excessive menu height.
+- **Zero-shift, zero-jump column resizing** in `getResizerProps`: locks actual rendered `<th>` pixel widths directly in the DOM on `mousedown`, forces `table-layout: fixed; width: max-content`, suppresses `ResizeObserver` container width recalculations while dragging, and commits all frozen widths atomically on `mouseup`.
+- `getHeaderProps(index, colId)` now includes `'data-col-id': colId` automatically so `getResizerProps` can always identify and freeze every header column.
+- Broadened `toggleSelection(id: string | number)` parameter type to support both string and numeric row IDs.
+
+### @liji-table/ui
+
+#### Added
+- **Dropdown density toggle**: integrated density toggling (`Compact` / `Comfortable`) directly into `<UniversalTable />`'s column context menu.
+- **Layout persistence**: column context menu exposes "Save Layout" and "Reset Layout" whenever `persistKey` is provided.
+
+#### Fixed
+- **Grid lines & theme contrast**: updated `--liji-border` from faint `#eaecf0` to crisp `#cbd5e1`, and added vertical border separators between column filter header inputs.
+- **Text-only context menu**: standardized on clean text without emojis or symbols, with tightened `6px 14px` padding and `13px` font size.
+- **Header click sorting**: clicking a sortable column header in `<UniversalTable />` now toggles sort direction (`asc` → `desc` → `none`) with stop-propagation on the resize handle.
+- **Controlled filter inputs**: bound `value={state.filters?.[col.id] || ''}` on column filter inputs so programmatic filter resets stay in sync with the UI.
+- **Toolbar column visibility menu**: clicking anywhere on a column menu item row now toggles visibility cleanly.
+- **NPM dependencies & exports**: added missing `@liji-table/react` dependency to `package.json` and added TypeScript `types` entries to `exports`.
+
+### @liji-table/angular
+
+#### Added
+- **Layout persistence**: `saveLayout()`, `resetLayout()`, and `hasSavedLayout()` on Angular `UniversalTable` with `persistKey` auto-restore.
+- **Dropdown density toggle**: added density toggling to the column context menu dropdown in `<liji-table>`.
+- Full Core API parity on `UniversalTable`: exposed multi-column sorting (`setSortColumns`, `addSort`, `removeSort`), advanced filtering (`setAdvancedFilter`, `clearAdvancedFilter`, `clearAllAdvancedFilters`), row grouping (`setGrouping`, `toggleGroup`, `expandAll`, `collapseAll`), inline cell editing (`startEdit`, `setEditingValue`, `saveEdit`, `cancelEdit`, `isEditing`, `onCellChange`), and layout snapshot methods.
+- Re-exported core types and utilities from `@liji-table/angular` public API.
+
+#### Fixed
+- **Text-only context menu**: removed emoji/symbol icons (`💾`, `♻`, `⟷`, `⤢`) from the context menu in `<liji-table>` for clean, professional presentation.
+- **Filter row borders**: added vertical border separators to align filter inputs with column borders.
+- **Header click sorting**: clicking a sortable column header in `<liji-table>` now calls `table.toggleSort(col.id)` without triggering on resize handle clicks.
+- **Zero-shift column resizing**: `startResize` locks rendered `<th>` widths in the DOM on `mousedown`, guards `updateContainerWidth` during active resize, and commits widths atomically on `mouseup`.
+- Replaced internal `UniversalTableCore` usage with `LijiTable` to eliminate false deprecation warnings in the console.
+- Context menu now conditionally hides `Sort Asc` / `Sort Desc` when a column has `sortable: false`.
+- Controlled `[value]` binding on column filter inputs.
+
 ## [0.0.9]
 
 ### @liji-table/core

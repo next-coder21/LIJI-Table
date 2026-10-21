@@ -56,6 +56,16 @@ describe('LijiTable', () => {
             expect(table.getRows().length).toBe(1);
             expect(table.getRows()[0].name).toBe('Frank');
         });
+
+        it('should clamp pageIndex if setData shrinks total pages below current pageIndex', () => {
+            table.setPageSize(2);
+            table.setPage(2); // Page 3 (index 2)
+            expect(table.getState().pageIndex).toBe(2);
+
+            table.setData([{ id: 6, name: 'Frank', age: 40, role: 'CEO' }]);
+            expect(table.getState().pageIndex).toBe(0);
+            expect(table.getRows().length).toBe(1);
+        });
     });
 
     describe('Pagination', () => {
@@ -263,6 +273,26 @@ describe('LijiTable', () => {
             expect(state.columnWidths).toEqual({});
             expect(state.columns.find(c => c.id === 'age')?.pinned).toBe('left');
             expect(state.columns.find(c => c.id === 'role')?.hidden).toBe(true);
+        });
+    });
+
+    describe('getCSVContent', () => {
+        it('excludes hidden columns and rows filtered out by search', () => {
+            table.toggleVisibility('role');
+            table.setSearch('Alice');
+
+            const csv = table.getCSVContent();
+            const [header, ...body] = csv.split('\n');
+
+            expect(header).toBe('ID,Name,Age');
+            expect(body).toEqual(['1,"Alice",25']);
+        });
+
+        it('normalizes null/undefined values to empty string in CSV output', () => {
+            const t = new LijiTable([{ id: 1, name: null as any, age: undefined as any, role: 'Dev' }], mockColumns);
+            const csv = t.getCSVContent();
+            const [, row] = csv.split('\n');
+            expect(row).toBe('1,"","","Dev"');
         });
     });
 

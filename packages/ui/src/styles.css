@@ -2,7 +2,7 @@
 :root {
   --liji-bg: #f8f9fa;       
   --liji-white: #ffffff;
-  --liji-border: #eaecf0;   
+  --liji-border: #cbd5e1;   
   --liji-text-main: #101828;
   --liji-text-sub: #667085;
   --liji-primary: #3b82f6;
@@ -52,7 +52,8 @@
 
 /* --- 3. The Table --- */
 .liji-table {
-  width: max-content;
+  width: 0;
+  min-width: 0;
   /* NOTE: every column - resized or not - always gets an explicit pixel
      `width` computed in JS (see computeAutoFitWidths in @liji-table/core),
      so this never relies on the browser's own table-layout: fixed
@@ -89,6 +90,9 @@
   letter-spacing: 0.04em;
   padding: 12px 24px;      
   user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   
   border-bottom: 1px solid var(--liji-border);
   border-right: 1px solid var(--liji-border); 
@@ -102,6 +106,9 @@
   align-items: center; 
   width: 100%; 
   cursor: grab; 
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .liji-th-content:active { cursor: grabbing; }
 
@@ -175,13 +182,14 @@ th.liji-drag-over {
   background: var(--liji-white);
   border: 1px solid var(--liji-border);
   border-radius: 8px;
-  box-shadow: var(--liji-shadow-lg);
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.12), 0 2px 6px -1px rgba(0, 0, 0, 0.08);
   z-index: 1000;
-  width: 180px;
+  width: 165px;
   padding: 4px 0;
-  font-family: 'Inter', sans-serif;
+  font-family: inherit;
   font-size: 13px;
-  color: #344054;
+  font-weight: 500;
+  color: #334155;
 }
 
 .liji-menu-header {
@@ -193,7 +201,7 @@ th.liji-drag-over {
 }
 
 .liji-menu-item {
-  padding: 8px 12px;
+  padding: 6px 14px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -295,6 +303,10 @@ th.liji-drag-over {
   padding: 4px 8px !important;
   background: #f9fafb;
   border-bottom: 1px solid var(--liji-border);
+  border-right: 1px solid var(--liji-border);
+}
+.liji-filter-row th:last-child {
+  border-right: none;
 }
 .liji-filter-input {
   width: 100%;

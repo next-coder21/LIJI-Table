@@ -1,4 +1,19 @@
-import { UniversalTableCore, TableState, TableColumn, ColumnAlign, SortDirection, LayoutSnapshot, computeAutoFitWidths, GroupRow } from '@liji-table/core';
+import {
+  LijiTable,
+  TableState,
+  TableColumn,
+  ColumnAlign,
+  SortDirection,
+  SortEntry,
+  FilterOperator,
+  FilterCondition,
+  CellEditorType,
+  CellValidator,
+  LayoutSnapshot,
+  computeAutoFitWidths,
+  GroupRow,
+  isGroupRow
+} from '@liji-table/core';
 import { BehaviorSubject, Observable, combineLatest } from 'rxjs';
 import { map } from 'rxjs/operators';
 
@@ -34,7 +49,7 @@ function clearLayoutFromStorage(key: string) {
 
 export class UniversalTable<T extends { id: any }> {
   // 1. Internal Brain
-  private core: UniversalTableCore<T>;
+  private core: LijiTable<T>;
 
   // 2. Reactive State (RxJS)
   private stateSubject: BehaviorSubject<TableState>;
@@ -50,13 +65,13 @@ export class UniversalTable<T extends { id: any }> {
   // 5. Auto-Fit Column Widths
   private containerWidthSubject = new BehaviorSubject<number>(0);
   public containerWidth$ = this.containerWidthSubject.asObservable();
-  private reservedWidth: number;
+  private reservedWidthSubject: BehaviorSubject<number>;
 
   constructor(data: T[], columns: TableColumn[] = [], persistKey?: string, reservedWidth: number = 0) {
-    this.core = new UniversalTableCore(data, columns);
+    this.core = new LijiTable(data, columns);
     this.persistKey = persistKey;
     this.initialColumns = columns;
-    this.reservedWidth = reservedWidth;
+    this.reservedWidthSubject = new BehaviorSubject<number>(reservedWidth);
 
     if (persistKey) {
       const savedLayout = loadLayoutFromStorage(persistKey);
@@ -99,24 +114,27 @@ export class UniversalTable<T extends { id: any }> {
   // --- Auto-Fit Column Widths ---
   /** Call with the scrolling wrapper's current clientWidth (e.g. from a ResizeObserver) so un-resized columns can proportionally fill it. */
   updateContainerWidth(px: number) {
+    if (this.isResizing) return;
     if (this.containerWidthSubject.value !== px) this.containerWidthSubject.next(px);
   }
 
   /** Width (px) to reserve for elements outside the column list, e.g. a checkbox column. */
   setReservedWidth(px: number) {
-    this.reservedWidth = px;
+    if (this.reservedWidthSubject.value !== px) {
+      this.reservedWidthSubject.next(px);
+    }
   }
 
   /** Synchronously compute the current pixel width for every visible column - see computeAutoFitWidths in @liji-table/core. */
   getComputedColumnWidths(): Record<string, number> {
     const state = this.stateSubject.value;
-    return computeAutoFitWidths(state.columns, state.columnWidths, this.containerWidthSubject.value, this.reservedWidth);
+    return computeAutoFitWidths(state.columns, state.columnWidths, this.containerWidthSubject.value, this.reservedWidthSubject.value);
   }
 
-  /** Reactive stream of getComputedColumnWidths(), recomputed whenever state or container width changes. */
+  /** Reactive stream of getComputedColumnWidths(), recomputed whenever state, container width, or reserved width changes. */
   get computedColumnWidths$(): Observable<Record<string, number>> {
-    return combineLatest([this.state$, this.containerWidth$]).pipe(
-      map(([state, containerWidth]) => computeAutoFitWidths(state.columns, state.columnWidths, containerWidth, this.reservedWidth))
+    return combineLatest([this.state$, this.containerWidth$, this.reservedWidthSubject]).pipe(
+      map(([state, containerWidth, reservedWidth]) => computeAutoFitWidths(state.columns, state.columnWidths, containerWidth, reservedWidth))
     );
   }
 
@@ -190,9 +208,31 @@ export class UniversalTable<T extends { id: any }> {
   setSearch(q: string) { this.core.setSearch(q); }
   setFilter(colId: string, val: string) { this.core.setFilter(colId, val); }
 
-  // Sorting
+  // Advanced Filters
+  setAdvancedFilter(colId: string, condition: FilterCondition) { this.core.setAdvancedFilter(colId, condition); }
+  clearAdvancedFilter(colId: string) { this.core.clearAdvancedFilter(colId); }
+  clearAllAdvancedFilters() { this.core.clearAllAdvancedFilters(); }
+
+  // Sorting (Single & Multi-Column)
   toggleSort(colId: string) { this.core.toggleSort(colId); }
   setSortDirection(colId: string, dir: SortDirection) { this.core.setSortDirection(colId, dir); }
+  setSortColumns(sorts: SortEntry[]) { this.core.setSortColumns(sorts); }
+  addSort(colId: string, dir: 'asc' | 'desc') { this.core.addSort(colId, dir); }
+  removeSort(colId: string) { this.core.removeSort(colId); }
+
+  // Row Grouping
+  setGrouping(colIds: string[]) { this.core.setGrouping(colIds); }
+  toggleGroup(groupKey: string) { this.core.toggleGroup(groupKey); }
+  expandAll() { this.core.expandAll(); }
+  collapseAll() { this.core.collapseAll(); }
+
+  // Inline Cell Editing
+  startEdit(rowId: string | number, colId: string) { return this.core.startEdit(rowId, colId); }
+  setEditingValue(val: any) { this.core.setEditingValue(val); }
+  saveEdit() { return this.core.saveEdit(); }
+  cancelEdit() { this.core.cancelEdit(); }
+  isEditing(rowId: string | number, colId: string) { return this.core.isEditing(rowId, colId); }
+  onCellChange(cb: (rowId: string | number, columnId: string, newValue: any, oldValue: any) => void) { return this.core.onCellChange(cb); }
 
   // Pagination
   setPage(p: number) { this.core.setPage(p); }
@@ -201,10 +241,10 @@ export class UniversalTable<T extends { id: any }> {
   prevPage() { this.core.setPage(this.stateSubject.value.pageIndex - 1); }
 
   // Selection
-  toggleSelection(id: number) { this.core.toggleSelection(id); }
+  toggleSelection(id: string | number) { this.core.toggleSelection(id); }
   toggleAllPage() { this.core.toggleAllPage(); }
   isAllPageSelected() {
-    const rows = this.core.getRows().filter((r): r is T => !(r as any).isGroup); // only leaf rows are selectable
+    const rows = this.core.getRows().filter((r): r is T => !isGroupRow(r)); // only leaf rows are selectable
     return rows.length > 0 && rows.every(r => this.stateSubject.value.selectedIds.includes(r.id));
   }
 
@@ -216,7 +256,12 @@ export class UniversalTable<T extends { id: any }> {
   // Columns
   toggleVisibility(colId: string) { this.core.toggleVisibility(colId); }
   setColumnAlign(colId: string, align: ColumnAlign) { this.core.setColumnAlign(colId, align); }
-  pinColumn(colId: string, pin: 'left' | 'right' | null) { this.core.pinColumn(colId, pin); }
+  pinColumn(colId: string, pin: 'left' | 'right' | null, options?: { reorder?: boolean }) { this.core.pinColumn(colId, pin, options); }
+  reorderColumn(fromIndex: number, toIndex: number) { this.core.reorderColumn(fromIndex, toIndex); }
+  setColumnWidth(colId: string, width: number) { this.core.setColumnWidth(colId, width); }
+  setColumnWidths(widths: Record<string, number>) { this.core.setColumnWidths(widths); }
+  getLayoutSnapshot(): LayoutSnapshot { return this.core.getLayoutSnapshot(); }
+  applyLayoutSnapshot(snapshot: LayoutSnapshot) { this.core.applyLayoutSnapshot(snapshot); }
   autoResizeAllColumns() { this.core.autoResizeAllColumns(); }
   /**
    * Clears manually-set widths so `getComputedColumnWidths()`/`computedColumnWidths$` go back
@@ -287,44 +332,57 @@ export class UniversalTable<T extends { id: any }> {
     document.body.style.cursor = 'col-resize';
 
     const startX = event.pageX;
-    const headerNode = (event.target as HTMLElement).closest('th');
+    const headerNode = (event.target as HTMLElement).closest('th') as HTMLTableCellElement | null;
     if (!headerNode) return;
-
-    // 🧊 FREEZE: every column not yet in `columnWidths` is "auto" and
-    // proportionally fills the container by default (getComputedColumnWidths).
-    // The instant a resize drag starts, commit every column's CURRENT
-    // computed width into `columnWidths` - converting them all to "manual"
-    // at their present size - so only the column being dragged can change
-    // from here on. The table's total width simply grows/shrinks with it
-    // (the scroll wrapper handles overflow); no other column is ever
-    // recomputed as a side effect of this one drag.
-    const state = this.stateSubject.value;
-    const computed = this.getComputedColumnWidths();
-    const frozenWidths: Record<string, number> = {};
-    state.columns.forEach(c => {
-      if (state.columnWidths[c.id] == null) frozenWidths[c.id] = computed[c.id];
-    });
-    if (Object.keys(frozenWidths).length > 0) {
-      this.core.setColumnWidths(frozenWidths);
+    const tableNode = headerNode.closest('table');
+    if (tableNode) {
+      tableNode.style.tableLayout = 'fixed';
+      tableNode.style.width = '0px';
+      tableNode.style.minWidth = '0px';
     }
 
-    // Start from the column's current computed width (not a stale default),
-    // so there's no jump the instant the drag begins.
-    const startWidth = computed[colId] ?? headerNode.getBoundingClientRect().width;
+    const state = this.stateSubject.value;
+    const computed = this.getComputedColumnWidths();
+    const frozenWidths: Record<string, number> = { ...computed, ...state.columnWidths };
+
+    if (tableNode) {
+      const allThs = tableNode.querySelectorAll<HTMLTableCellElement>('thead tr:first-child th');
+      allThs.forEach(th => {
+        const cid = th.getAttribute('data-col-id');
+        const w = Math.round(th.getBoundingClientRect().width);
+        if (w > 0) {
+          if (cid) frozenWidths[cid] = w;
+          th.style.width = `${w}px`;
+          th.style.minWidth = `${w}px`;
+          th.style.maxWidth = `${w}px`;
+        }
+      });
+    }
+
+    const startWidth = frozenWidths[colId] ?? Math.round(headerNode.getBoundingClientRect().width);
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       if (!headerNode) return;
-      const newWidth = Math.max(50, startWidth + (moveEvent.pageX - startX));
+      const newWidth = Math.max(50, Math.round(startWidth + (moveEvent.pageX - startX)));
       headerNode.style.width = `${newWidth}px`;
+      headerNode.style.minWidth = `${newWidth}px`;
+      headerNode.style.maxWidth = `${newWidth}px`;
     };
 
     const onMouseUp = (upEvent: MouseEvent) => {
-      const newWidth = Math.max(50, startWidth + (upEvent.pageX - startX));
-      this.core.setColumnWidth(colId, newWidth);
+      const newWidth = Math.max(50, Math.round(startWidth + (upEvent.pageX - startX)));
+      if (tableNode) {
+        const allThs = tableNode.querySelectorAll<HTMLTableCellElement>('thead tr:first-child th');
+        allThs.forEach(th => {
+          th.style.minWidth = '';
+          th.style.maxWidth = '';
+        });
+      }
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
       document.body.style.cursor = 'default';
       this.isResizing = false;
+      this.core.setColumnWidths({ ...frozenWidths, [colId]: newWidth });
     };
 
     document.addEventListener('mousemove', onMouseMove);

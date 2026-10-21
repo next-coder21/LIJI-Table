@@ -1,16 +1,43 @@
 {
   "name": "@liji-table/react",
-  "version": "0.0.9",
+  "version": "0.0.10",
+  "description": "React hook adapter (useLijiTable) for @liji-table/core with built-in virtualization, ResizeObserver auto-fit widths, localStorage layout persistence, and zero-lag DOM column resizing.",
+  "keywords": [
+    "react",
+    "react-table",
+    "datagrid",
+    "headless-table",
+    "virtualization",
+    "liji-table"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
   "license": "MIT",
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/next-coder21/LIJI-Table.git",
+    "directory": "packages/react"
+  },
+  "homepage": "https://github.com/next-coder21/LIJI-Table",
+  "bugs": "https://github.com/next-coder21/LIJI-Table/issues",
   "scripts": {
     "build": "tsc"
   },
   "dependencies": {
-    "@liji-table/core": "*"
+    "@liji-table/core": "^0.0.10"
   },
   "peerDependencies": {
     "react": ">=18.0.0",

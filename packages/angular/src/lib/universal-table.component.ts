@@ -1,4 +1,4 @@
-import { Component, Input, TemplateRef, ElementRef, ViewChild, ViewChildren, QueryList, AfterViewInit, OnChanges, OnDestroy } from '@angular/core';
+import { Component, Input, Output, EventEmitter, TemplateRef, ElementRef, ViewChild, ViewChildren, QueryList, AfterViewInit, OnChanges, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { UniversalTable } from './universal-table';
 
@@ -33,13 +33,16 @@ import { UniversalTable } from './universal-table';
                   scope="col"
                   [attr.aria-sort]="(table.state$ | async)?.sortColumn === col.id ? ((table.state$ | async)?.sortDirection === 'asc' ? 'ascending' : 'descending') : null"
               >
-                 <div class="liji-th-content" [style.justify-content]="col.align || 'flex-start'">
+                 <div class="liji-th-content"
+                      [style.justify-content]="col.align || 'flex-start'"
+                      [style.cursor]="col.sortable !== false ? 'pointer' : 'default'"
+                      (click)="col.sortable !== false && table.toggleSort(col.id)">
                     {{ col.label }}
                     <span *ngIf="(table.state$ | async)?.sortColumn === col.id" class="liji-sort-icon">
                        {{ (table.state$ | async)?.sortDirection === 'asc' ? '↑' : '↓' }}
                     </span>
                  </div>
-                 <div class="liji-resizer" (mousedown)="table.startResize($event, col.id)"></div>
+                 <div class="liji-resizer" (mousedown)="table.startResize($event, col.id)" (click)="$event.stopPropagation()"></div>
               </th>
             </tr>
 
@@ -50,6 +53,7 @@ import { UniversalTable } from './universal-table';
                    [ngStyle]="getFilterStickyStyle(col.id)"
                >
                  <input class="liji-filter-input" placeholder="Filter..."
+                        [value]="(table.state$ | async)?.filters?.[col.id] || ''"
                         (input)="onFilterChange(col.id, $event)">
                </th>
             </tr>
@@ -94,11 +98,14 @@ import { UniversalTable } from './universal-table';
 
       <div *ngIf="contextMenu" class="liji-context-menu" [style.top.px]="contextMenu.y" [style.left.px]="contextMenu.x">
           <div class="liji-menu-header">Actions</div>
-          <div class="liji-menu-item" (click)="action('autosizeAll')"><span>⟷</span> Autosize All</div>
-          <div class="liji-menu-item" (click)="action('fillContainer')"><span>⤢</span> Fill Container</div>
-          <div class="liji-menu-divider"></div>
-          <div class="liji-menu-item" (click)="action('sortAsc')">Sort Asc</div>
-          <div class="liji-menu-item" (click)="action('sortDesc')">Sort Desc</div>
+          <div class="liji-menu-item" (click)="action('autosizeAll')">Autosize All</div>
+          <div class="liji-menu-item" (click)="action('fillContainer')">Fill Container</div>
+          <div class="liji-menu-item" (click)="action('toggleDensity')">{{ density === 'compact' ? 'Comfortable' : 'Compact' }}</div>
+          <ng-container *ngIf="contextMenu.sortable">
+            <div class="liji-menu-divider"></div>
+            <div class="liji-menu-item" (click)="action('sortAsc')">Sort Asc</div>
+            <div class="liji-menu-item" (click)="action('sortDesc')">Sort Desc</div>
+          </ng-container>
           <div class="liji-menu-divider"></div>
           <div class="liji-menu-item" (click)="action('pinLeft')">Pin Left</div>
           <div class="liji-menu-item" (click)="action('pinRight')">Pin Right</div>
@@ -109,8 +116,8 @@ import { UniversalTable } from './universal-table';
           <div class="liji-menu-item" (click)="action('alignRight')">Align Right</div>
           <ng-container *ngIf="table.persistEnabled">
             <div class="liji-menu-divider"></div>
-            <div class="liji-menu-item" (click)="action('saveLayout')">💾 Save Layout</div>
-            <div class="liji-menu-item" (click)="action('resetLayout')">♻ Reset Layout</div>
+            <div class="liji-menu-item" (click)="action('saveLayout')">Save Layout</div>
+            <div class="liji-menu-item" (click)="action('resetLayout')">Reset Layout</div>
           </ng-container>
       </div>
       <div *ngIf="contextMenu" (click)="contextMenu = null" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:99;"></div>
@@ -169,6 +176,7 @@ export class UniversalTableComponent implements AfterViewInit, OnChanges, OnDest
    *  sticky on every page and are shown with a duller background (no pin column/icon). */
   @Input() showRowPin = false;
   @Input() density: 'standard' | 'compact' | 'comfortable' = 'standard';
+  @Output() densityChange = new EventEmitter<'standard' | 'compact' | 'comfortable'>();
   @Input() cellTemplates: Record<string, TemplateRef<any>> = {};
 
   @ViewChild('scrollContainer') scrollContainerRef!: ElementRef<HTMLElement>;
@@ -189,42 +197,71 @@ export class UniversalTableComponent implements AfterViewInit, OnChanges, OnDest
   headerRowHeight = 45;
   rowHeight = 41;
 
-  contextMenu: { x: number, y: number, colId: string } | null = null;
+  contextMenu: { x: number, y: number, colId: string, sortable: boolean } | null = null;
   rowMenu: { x: number, y: number, rowId: any, pinned: 'top' | 'bottom' | null } | null = null;
+
+  constructor(private cdr: ChangeDetectorRef) {}
+
+  private measureHeaderAndRows() {
+    let changed = false;
+    const theadEl = this.theadElRef?.nativeElement;
+    if (theadEl) {
+      const headerRow = theadEl.querySelector('tr');
+      const newHeaderRowHeight = headerRow ? (headerRow as HTMLElement).offsetHeight : this.headerRowHeight;
+      const filterRow = theadEl.querySelector('tr.liji-filter-row');
+      const newHeaderHeight = newHeaderRowHeight + (filterRow ? (filterRow as HTMLElement).offsetHeight : 0);
+      if (newHeaderRowHeight > 0) {
+        // Apply directly to filter row ths in DOM so sticky top never lags by a frame
+        theadEl.querySelectorAll<HTMLElement>('tr.liji-filter-row th').forEach(th => {
+          th.style.top = `${newHeaderRowHeight}px`;
+        });
+        if (newHeaderRowHeight !== this.headerRowHeight) {
+          this.headerRowHeight = newHeaderRowHeight;
+          changed = true;
+        }
+      }
+      if (newHeaderHeight > 0 && newHeaderHeight !== this.headerHeight) {
+        this.headerHeight = newHeaderHeight;
+        changed = true;
+      }
+    }
+    const rowEl = this.rowEls?.first?.nativeElement;
+    if (rowEl && rowEl.offsetHeight > 0 && rowEl.offsetHeight !== this.rowHeight) {
+      this.rowHeight = rowEl.offsetHeight;
+      changed = true;
+    }
+    if (changed) {
+      this.cdr.detectChanges();
+    }
+  }
 
   ngOnChanges() {
     // Keep the checkbox column's width reserved out of the auto-fit
     // calculation for un-resized columns (see computeAutoFitWidths).
     this.table?.setReservedWidth(this.showCheckboxes ? 40 : 0);
+    // Re-measure header/row heights immediately after Angular applies density/filter classes to the DOM
+    setTimeout(() => this.measureHeaderAndRows(), 0);
   }
 
   ngAfterViewInit() {
-    // Deferred to a new macrotask: measuring here and writing it back
-    // synchronously (updateContainerWidth -> computedColumnWidths$ emits ->
-    // width bindings change) would land inside the same change-detection
-    // cycle Angular's dev-mode "no changes" pass just verified, triggering
-    // NG0100 (ExpressionChangedAfterItHasBeenCheckedError). Deferring runs
-    // it in a fresh cycle instead.
     setTimeout(() => {
       const node = this.scrollContainerRef?.nativeElement;
       if (node && typeof ResizeObserver !== 'undefined') {
         this.table.updateContainerWidth(node.clientWidth);
-        this.containerResizeObserver = new ResizeObserver(() => this.table.updateContainerWidth(node.clientWidth));
+        this.containerResizeObserver = new ResizeObserver(() => {
+          this.table.updateContainerWidth(node.clientWidth);
+          this.cdr.detectChanges();
+        });
         this.containerResizeObserver.observe(node);
       }
 
       const theadEl = this.theadElRef?.nativeElement;
       if (theadEl && typeof ResizeObserver !== 'undefined') {
-        const measure = () => {
-          this.headerHeight = theadEl.offsetHeight;
-          // First <tr> in the thead = the header row; the filter row sticks
-          // right below it.
-          const headerRow = theadEl.querySelector('tr');
-          if (headerRow) this.headerRowHeight = (headerRow as HTMLElement).offsetHeight;
-        };
-        measure();
-        this.headerResizeObserver = new ResizeObserver(measure);
+        this.measureHeaderAndRows();
+        this.headerResizeObserver = new ResizeObserver(() => this.measureHeaderAndRows());
         this.headerResizeObserver.observe(theadEl);
+        const firstTr = theadEl.querySelector('tr');
+        if (firstTr) this.headerResizeObserver.observe(firstTr);
       }
 
       this.observeFirstRow();
@@ -235,10 +272,10 @@ export class UniversalTableComponent implements AfterViewInit, OnChanges, OnDest
   /** Re-measures row height off whichever row renders first (pinned or windowed) - re-run whenever the rendered row set changes. */
   private observeFirstRow() {
     this.rowResizeObserver?.disconnect();
-    const rowEl = this.rowEls.first?.nativeElement;
+    const rowEl = this.rowEls?.first?.nativeElement;
     if (!rowEl || typeof ResizeObserver === 'undefined') return;
-    this.rowHeight = rowEl.offsetHeight;
-    this.rowResizeObserver = new ResizeObserver(() => { this.rowHeight = rowEl.offsetHeight; });
+    this.measureHeaderAndRows();
+    this.rowResizeObserver = new ResizeObserver(() => this.measureHeaderAndRows());
     this.rowResizeObserver.observe(rowEl);
   }
 
@@ -275,7 +312,8 @@ export class UniversalTableComponent implements AfterViewInit, OnChanges, OnDest
 
   onContextMenu(e: MouseEvent, colId: string) {
     e.preventDefault();
-    this.contextMenu = { x: e.clientX, y: e.clientY, colId };
+    const col = this.table.allColumns.find(c => c.id === colId);
+    this.contextMenu = { x: e.clientX, y: e.clientY, colId, sortable: col?.sortable !== false };
   }
 
   onRowContextMenu(e: MouseEvent, rowId: any) {
@@ -294,6 +332,12 @@ export class UniversalTableComponent implements AfterViewInit, OnChanges, OnDest
 
     if (type === 'autosizeAll') this.table.autoResizeAllColumns();
     if (type === 'fillContainer') this.table.resetColumnWidths();
+    if (type === 'toggleDensity') {
+      this.density = this.density === 'compact' ? 'standard' : 'compact';
+      this.densityChange.emit(this.density);
+      this.cdr.detectChanges();
+      setTimeout(() => this.measureHeaderAndRows(), 0);
+    }
     if (type === 'sortAsc') this.table.setSortDirection(colId, 'asc');
     if (type === 'sortDesc') this.table.setSortDirection(colId, 'desc');
     if (type === 'pinLeft') this.table.pinColumn(colId, 'left');

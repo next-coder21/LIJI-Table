@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/bundlephobia/minzip/@liji-table/core" alt="bundle size"/>
 </p>
 
-> **Version 0.0.9**
+> **Version 0.0.10**
 
 A **framework-agnostic, high-performance table engine** that powers the LIJI-Table ecosystem.  
 It provides all advanced table logic — sorting, filtering, pagination, column resizing, selection, pinning, export, and state management — without depending on any UI framework.
@@ -22,7 +22,7 @@ It provides all advanced table logic — sorting, filtering, pagination, column 
 
 ---
 
-## 🔄 Recent Updates (v0.0.9)
+## 🔄 Recent Updates (v0.0.10)
 
 ### ✨ New Features
 - **Layout Persistence** - `getLayoutSnapshot()` captures the current column arrangement (order, hidden, pinned, align, widths) as a plain serializable object; `applyLayoutSnapshot(snapshot)` restores it, reordering/merging columns and leaving any columns not in the snapshot appended at the end. Framework packages (`react`, `angular`) build `localStorage` persistence on top of this.

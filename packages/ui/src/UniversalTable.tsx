@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, CSSProperties } from 'react';
-import { useUniversalTable } from '@liji-table/react';
+import { useLijiTable } from '@liji-table/react';
 import { ICONS } from './icons';
 import './styles.css';
 
@@ -45,15 +45,17 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
   showRowPin = false,
   persistKey
 }) => {
+  const [currentDensity, setCurrentDensity] = useState<'standard' | 'compact' | 'comfortable'>(density);
+  useEffect(() => { setCurrentDensity(density); }, [density]);
   const reservedWidth = showCheckboxes ? 40 : 0;
-  const internalHook = useUniversalTable(data, columns, { persistKey, reservedWidth });
+  const internalHook = useLijiTable(data, columns, { persistKey, reservedWidth });
   const table = tableInstance || internalHook;
 
   const {
     state, visibleColumns, totalPages, selectedIds,
     toggleSelection, toggleAllPage, isAllPageSelected,
     getHeaderProps, getResizerProps,
-    setSortDirection, pinColumn, setColumnAlign,
+    toggleSort, setSortDirection, pinColumn, setColumnAlign,
     pinRow, isRowPinned,
     prevPage, nextPage, setPageSize, setFilter,
     saveLayout, resetLayout,
@@ -84,12 +86,22 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
     const theadEl = theadRef.current;
     if (!theadEl || typeof ResizeObserver === 'undefined') return;
     const measure = () => {
-      setHeaderHeight(theadEl.offsetHeight);
       const headerRow = theadEl.querySelector('tr');
-      if (headerRow) setHeaderRowHeight((headerRow as HTMLElement).offsetHeight);
+      const filterRow = theadEl.querySelector('tr.liji-filter-row');
+      const hRowH = headerRow ? (headerRow as HTMLElement).offsetHeight : 45;
+      const fRowH = filterRow ? (filterRow as HTMLElement).offsetHeight : 0;
+      if (hRowH > 0) {
+        theadEl.querySelectorAll<HTMLElement>('tr.liji-filter-row th').forEach(th => {
+          th.style.top = `${hRowH}px`;
+        });
+        setHeaderRowHeight(hRowH);
+      }
+      setHeaderHeight(hRowH + fRowH);
     };
     const observer = new ResizeObserver(measure);
     observer.observe(theadEl);
+    const firstTr = theadEl.querySelector('tr');
+    if (firstTr) observer.observe(firstTr);
     measure();
     return () => observer.disconnect();
   }, [showFilters, density]);
@@ -182,7 +194,7 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
     <div className="liji-grid-wrapper" style={{ height }}>
 
       <div className="liji-table-scroll" ref={containerRef as any} onScroll={onScroll}>
-        <table className={`liji-table liji-${density} ${enableStriped ? 'liji-striped' : ''}`} role="table" aria-label="Data Table">
+        <table className={`liji-table liji-${currentDensity} ${enableStriped ? 'liji-striped' : ''}`} role="table" aria-label="Data Table">
           <thead ref={theadRef}>
             {/* Header Row */}
             <tr>
@@ -206,11 +218,15 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
                     aria-sort={state.sortColumn === col.id ? (state.sortDirection === 'asc' ? 'ascending' : 'descending') : undefined}
                     onContextMenu={(e: any) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, colId: col.id, sortable: col.sortable !== false, pinned: col.pinned }); }}
                   >
-                    <div className="liji-th-content" style={{ justifyContent: col.align || 'flex-start' }}>
+                    <div
+                      className="liji-th-content"
+                      style={{ justifyContent: col.align || 'flex-start', cursor: col.sortable !== false ? 'pointer' : 'default' }}
+                      onClick={() => col.sortable !== false && toggleSort && toggleSort(col.id)}
+                    >
                       {col.label}
                       {state.sortColumn === col.id && <span className="liji-sort-icon" dangerouslySetInnerHTML={{ __html: state.sortDirection === 'asc' ? ICONS.sortAsc : ICONS.sortDesc }} />}
                     </div>
-                    <div className="liji-resizer" {...getResizerProps(col.id)} />
+                    <div className="liji-resizer" {...getResizerProps(col.id)} onClick={(e) => e.stopPropagation()} />
                   </th>
                 );
               })}
@@ -232,6 +248,7 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
                       <input
                         className="liji-filter-input"
                         placeholder={`Filter...`}
+                        value={state.filters?.[col.id] || ''}
                         onChange={(e) => setFilter && setFilter(col.id, e.target.value)}
                       />
                     </th>
@@ -286,8 +303,9 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
       {contextMenu && (
         <div className="liji-context-menu" style={{ top: contextMenu.y, left: contextMenu.x }}>
           <div className="liji-menu-header">Actions</div>
-          <div className="liji-menu-item" onClick={() => { table.autoResizeAllColumns(); setContextMenu(null); }}><span>⟷</span> Autosize All</div>
-          <div className="liji-menu-item" onClick={() => { table.resetColumnWidths(); setContextMenu(null); }}><span>⤢</span> Fill Container</div>
+          <div className="liji-menu-item" onClick={() => { table.autoResizeAllColumns(); setContextMenu(null); }}>Autosize All</div>
+          <div className="liji-menu-item" onClick={() => { table.resetColumnWidths(); setContextMenu(null); }}>Fill Container</div>
+          <div className="liji-menu-item" onClick={() => { setCurrentDensity(d => d === 'compact' ? 'standard' : 'compact'); setContextMenu(null); }}>{currentDensity === 'compact' ? 'Comfortable' : 'Compact'}</div>
           <div className="liji-menu-divider" />
           {contextMenu.sortable && <>
             <div className="liji-menu-item" onClick={() => { setSortDirection(contextMenu.colId, 'asc'); setContextMenu(null); }}>Sort Asc</div>
@@ -303,8 +321,8 @@ export const UniversalTable: React.FC<UniversalTableProps> = ({
           <div className="liji-menu-item" onClick={() => { setColumnAlign(contextMenu.colId, 'right'); setContextMenu(null); }}>Align Right</div>
           {persistKey && <>
             <div className="liji-menu-divider" />
-            <div className="liji-menu-item" onClick={() => { saveLayout(); setContextMenu(null); }}>💾 Save Layout</div>
-            <div className="liji-menu-item" onClick={() => { resetLayout(); setContextMenu(null); }}>♻ Reset Layout</div>
+            <div className="liji-menu-item" onClick={() => { saveLayout(); setContextMenu(null); }}>Save Layout</div>
+            <div className="liji-menu-item" onClick={() => { resetLayout(); setContextMenu(null); }}>Reset Layout</div>
           </>}
         </div>
       )}

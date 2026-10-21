@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/bundlephobia/minzip/@liji-table/angular" alt="bundle size"/>
 </p>
 
-> **Version 0.0.9**
+> **Version 0.0.10**
 
 **Angular components and services** built on top of `@liji-table/core` with full RxJS integration.  
 Provides enterprise-ready data table functionality for Angular 18+ applications.
@@ -22,7 +22,7 @@ Provides enterprise-ready data table functionality for Angular 18+ applications.
 
 ---
 
-## 🔄 What's New (v0.0.9)
+## 🔄 What's New (v0.0.10)
 
 ### ✨ New Features
 - **Layout persistence** - pass a `persistKey` as the 3rd constructor argument (`new UniversalTable(data, columns, 'users-table')`) and the column arrangement auto-restores from `localStorage` on mount. Call `table.saveLayout()` / `table.resetLayout()` / `table.hasSavedLayout()`. The `<liji-table>` component shows "💾 Save Layout" / "♻ Reset Layout" in its column context menu automatically when `persistEnabled` is true.

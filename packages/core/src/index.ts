@@ -118,14 +118,29 @@ export function computeAutoFitWidths(
 
   if (autoCols.length === 0) return result;
 
+  if (containerWidth <= 0) {
+    autoCols.forEach(c => {
+      result[c.id] = Math.max(c.minWidth || 50, c.width || 150);
+    });
+    return result;
+  }
+
   const available = Math.max(0, containerWidth - reservedWidth - manualSum);
   const autoDefaultTotal = autoCols.reduce((sum, c) => sum + (c.width || 150), 0) || 1;
 
-  autoCols.forEach(c => {
+  let allocated = 0;
+  autoCols.forEach((c, idx) => {
     const defaultW = c.width || 150;
     const minW = c.minWidth || 50;
-    const share = (defaultW / autoDefaultTotal) * available;
-    result[c.id] = Math.max(minW, Math.round(share));
+    if (idx === autoCols.length - 1) {
+      const remainder = available - allocated;
+      result[c.id] = Math.max(minW, Math.round(remainder));
+    } else {
+      const share = (defaultW / autoDefaultTotal) * available;
+      const w = Math.max(minW, Math.round(share));
+      result[c.id] = w;
+      allocated += w;
+    }
   });
 
   return result;
@@ -266,6 +281,13 @@ export class LijiTable<T extends { id: any }> {
 
   setData(data: T[]) {
     this.data = data;
+    const totalPages = this.getTotalPages();
+    if (this.state.pageIndex > 0 && this.state.pageIndex >= totalPages) {
+      this.state = {
+        ...this.state,
+        pageIndex: Math.max(0, totalPages - 1)
+      };
+    }
     this.notify(); // Recalculate derived data
   }
 
@@ -723,16 +745,21 @@ export class LijiTable<T extends { id: any }> {
    * calling this will visibly shrink columns and leave empty space, not fill it.
    */
   autoResizeAllColumns() {
-    // Basic heuristic: average char width * max length
-    // In a real app, this would use canvas measurement or DOM measurement
+    // Heuristic accounting for header uppercase text + sort icon + horizontal cell padding
     const newWidths: Record<string, number> = {};
+    const sampleRows = this.data.slice(0, 100);
     this.state.columns.forEach(col => {
       if (col.hidden) return;
-      const maxContentLen = Math.max(
-        col.label.length,
-        ...this.data.map(r => String((r as any)[col.id]).length).slice(0, 100) // Sample 100
-      );
-      newWidths[col.id] = Math.max(50, Math.min(300, maxContentLen * 10)); // Clamp 50-300
+      const headerLen = col.label.length;
+      const maxDataLen = sampleRows.reduce((max, r) => {
+        const val = (r as any)[col.id];
+        const str = Array.isArray(val) ? val.join(', ') : (val == null ? '' : String(val));
+        return Math.max(max, str.length);
+      }, 0);
+      const estimatedPx = Math.max(headerLen * 9 + 44, maxDataLen * 8 + 36);
+      const minW = col.minWidth || 72;
+      const maxW = col.maxWidth || 300;
+      newWidths[col.id] = Math.max(minW, Math.min(maxW, Math.round(estimatedPx)));
     });
     this.setState({ columnWidths: { ...this.state.columnWidths, ...newWidths } });
   }
@@ -796,9 +823,26 @@ export class LijiTable<T extends { id: any }> {
   }
 
   expandAll() {
-    // Ideally we would traverse all groups, but for now we might need a way to get all group keys.
-    // Lazy approach: we can't easily enable "all" unless we walk the tree.
-    // TODO: Implement recursive collection of group keys.
+    if (this.state.grouping.length === 0) return;
+    const allKeys: string[] = [];
+    const collectKeys = (rows: T[], depth: number, parentKeyParts: string[]) => {
+      if (depth >= this.state.grouping.length) return;
+      const colId = this.state.grouping[depth];
+      const groups = new Map<string, T[]>();
+      rows.forEach(row => {
+        const val = (row as any)[colId];
+        const key = val === null || val === undefined ? '' : String(val);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(row);
+      });
+      for (const [key, groupRows] of groups.entries()) {
+        const parts = [...parentKeyParts, key];
+        allKeys.push(parts.join('::'));
+        collectKeys(groupRows, depth + 1, parts);
+      }
+    };
+    collectKeys(this.data, 0, []);
+    this.setState({ expandedGroupIds: allKeys });
   }
 
   collapseAll() {
@@ -908,18 +952,25 @@ export class LijiTable<T extends { id: any }> {
   // Recursively Group Data and Flatten Visible Rows
   private groupData(rows: T[], depth: number, parentKeyParts: any[]): (T | GroupRow<T>)[] {
     if (depth >= this.state.grouping.length) {
-      // Leaf level: return sorted rows
-      if (this.state.sortColumn) {
-        const { sortColumn, sortDirection } = this.state;
+      // Leaf level: return sorted rows (multi-column or single-column)
+      const sortsToApply = this.state.sortColumns.length > 0
+        ? this.state.sortColumns
+        : (this.state.sortColumn ? [{ columnId: this.state.sortColumn, direction: this.state.sortDirection as 'asc' | 'desc' }] : []);
+
+      if (sortsToApply.length > 0) {
         const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
         return [...rows].sort((a, b) => {
-          const valA = (a as any)[sortColumn!];
-          const valB = (b as any)[sortColumn!];
-          // Use natural sort for strings, numeric comparison for numbers
-          const comparison = typeof valA === 'string' && typeof valB === 'string'
-            ? collator.compare(valA, valB)
-            : valA < valB ? -1 : valA > valB ? 1 : 0;
-          return sortDirection === 'asc' ? comparison : -comparison;
+          for (const sort of sortsToApply) {
+            const valA = (a as any)[sort.columnId];
+            const valB = (b as any)[sort.columnId];
+            const comparison = typeof valA === 'string' && typeof valB === 'string'
+              ? collator.compare(valA, valB)
+              : valA < valB ? -1 : valA > valB ? 1 : 0;
+            if (comparison !== 0) {
+              return sort.direction === 'asc' ? comparison : -comparison;
+            }
+          }
+          return 0;
         });
       }
       return rows;
@@ -1017,15 +1068,22 @@ export class LijiTable<T extends { id: any }> {
     return { top, bottom };
   }
 
+  /**
+   * Exports the currently visible columns (hidden ones excluded) for the currently
+   * filtered/searched/sorted rows - not every column or the raw unfiltered dataset.
+   * Group-header rows are skipped if grouping is active; only leaf rows are exported.
+   */
   getCSVContent() {
-    // Export only leaf nodes for now? Or indented?
-    // Simple implementation: Flat export ignoring groups
-    const rows = this.data; // export all data, or filtered?
+    const columns = this.state.columns.filter(c => !c.hidden);
+    const rows = this.getAllFilteredRows().filter((r): r is T => !isGroupRow(r));
     if (rows.length === 0) return '';
 
-    const header = this.state.columns.map(c => c.label).join(',');
+    const header = columns.map(c => c.label).join(',');
     const body = rows.map(r => {
-      return this.state.columns.map(c => JSON.stringify((r as any)[c.id])).join(',');
+      return columns.map(c => {
+        const val = (r as any)[c.id];
+        return JSON.stringify(val === null || val === undefined ? '' : val);
+      }).join(',');
     }).join('\n');
 
     return `${header}\n${body}`;
@@ -1055,7 +1113,7 @@ export class UniversalTableCore<T extends { id: any }> extends LijiTable<T> {
       console.warn(
         '[Liji Table] UniversalTableCore is deprecated. Please use LijiTable instead. ' +
         'This alias will be removed in v2.0.0. ' +
-        'See migration guide: https://github.com/yourrepo/liji-table#migration'
+        'See migration guide: https://github.com/next-coder21/LIJI-Table#migration'
       );
     }
   }

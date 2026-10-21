@@ -75,4 +75,30 @@ describe('UniversalTableCore - Row Grouping', () => {
         // Now: Admin + UK + USA + Alice + Bob + User
         expect(table.getRows().length).toBe(6);
     });
+
+    it('should expandAll() and collapseAll() across nested grouping levels', () => {
+        const table = new UniversalTableCore(mockData, mockColumns);
+        table.setPageSize(20);
+        table.setGrouping(['role', 'country']);
+        table.expandAll();
+
+        // All groups (Admin, User, Admin::UK, Admin::USA, User::UK, User::USA) + 5 leaf rows = 11 rows
+        const rows = table.getRows();
+        expect(rows.length).toBe(11);
+
+        table.collapseAll();
+        expect(table.getRows().length).toBe(2); // Back to top-level Admin, User
+    });
+
+    it('should sort leaf rows inside expanded groups using multi-column sortColumns', () => {
+        const table = new UniversalTableCore(mockData, mockColumns);
+        table.setGrouping(['role']);
+        table.expandAll();
+        table.setSortColumns([{ columnId: 'country', direction: 'asc' }, { columnId: 'name', direction: 'desc' }]);
+
+        const rows = table.getRows();
+        // Admin group -> UK (Eve), USA (Bob, then Alice because name desc)
+        const adminLeaves = rows.slice(1, 4) as any[];
+        expect(adminLeaves.map(r => r.name)).toEqual(['Eve', 'Bob', 'Alice']);
+    });
 });

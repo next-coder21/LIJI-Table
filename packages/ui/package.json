@@ -1,17 +1,41 @@
 {
   "name": "@liji-table/ui",
-  "version": "0.0.9",
+  "version": "0.0.10",
+  "description": "Pre-built React UI components (<UniversalTable />, <UniversalTableToolbar />) with sticky pinned rows/columns, context menus, and CSS theme variables for Liji Table.",
+  "keywords": [
+    "react",
+    "table-ui",
+    "datagrid",
+    "sticky-columns",
+    "virtualization",
+    "liji-table"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "style": "dist/styles.css",
+  "sideEffects": [
+    "*.css"
+  ],
   "license": "MIT",
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/next-coder21/LIJI-Table.git",
+    "directory": "packages/ui"
+  },
+  "homepage": "https://github.com/next-coder21/LIJI-Table",
+  "bugs": "https://github.com/next-coder21/LIJI-Table/issues",
   "scripts": {
     "build": "tsc && node -e \"require('fs').copyFileSync('src/styles.css','dist/styles.css')\""
   },
   "dependencies": {
-    "@liji-table/core": "*"
+    "@liji-table/core": "^0.0.10",
+    "@liji-table/react": "^0.0.10"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
@@ -23,9 +47,18 @@
     "typescript": "^5.0.0"
   },
   "exports": {
-    ".": "./dist/index.js",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
     "./styles.css": "./dist/styles.css",
-    "./UniversalTable": "./dist/UniversalTable.js",
-    "./UniversalTableToolbar": "./dist/UniversalTableToolbar.js"
+    "./UniversalTable": {
+      "types": "./dist/UniversalTable.d.ts",
+      "default": "./dist/UniversalTable.js"
+    },
+    "./UniversalTableToolbar": {
+      "types": "./dist/UniversalTableToolbar.d.ts",
+      "default": "./dist/UniversalTableToolbar.js"
+    }
   }
 }
