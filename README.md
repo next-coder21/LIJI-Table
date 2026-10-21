@@ -265,4 +265,4 @@ table.downloadCSV('users.csv');
 
 ---
 
-**Built with ❤️ for developers who need powerful tables without the bloat**
+**Built by Lijish for developers who need powerful tables without the bloat**

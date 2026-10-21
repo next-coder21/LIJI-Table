@@ -478,7 +478,7 @@ table.pinRow(row.id, null);
 ))}`}</Code>
             </Section>
 
-            <Section id="virtualization" eyebrow="10" title="Row virtualization (100k+ rows)">
+            <Section id="virtualization" eyebrow="10" title="Row virtualization">
               <p className="text-[14px] leading-relaxed text-ink-muted">
                 When rendering large datasets on a single page, bind{" "}
                 <code className="font-mono text-[13px] text-ink">onScroll</code> to your scroll container and render spacer{" "}

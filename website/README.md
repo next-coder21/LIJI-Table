@@ -1,33 +1,73 @@
 # LIJI Table Website
 
-Marketing site, documentation, live playground and changelog for [LIJI Table](https://github.com/next-coder21/LIJI-Table), the framework-agnostic data table for React, Angular and Vanilla JS.
+The marketing site, documentation, live playground and changelog for [LIJI Table](https://github.com/next-coder21/LIJI-Table), a framework-agnostic data table for React, Angular and Vanilla JS.
 
-Built with Next.js (App Router), React and Tailwind CSS, and deployed as a static export under `/liji-table`.
+Live site: <https://lijishwilson.in/liji-table/>
+
+## Tech stack
+
+| Area | Choice |
+| --- | --- |
+| Framework | Next.js 16 (App Router) with React 19 |
+| Styling | Tailwind CSS 4 with CSS custom properties |
+| Language | TypeScript 5 |
+| Table packages | `@liji-table/core`, `@liji-table/react`, `@liji-table/ui` (`^0.0.10`) |
+| Output | Static export (`output: "export"`), served under `/liji-table` |
+| Linting | ESLint 9 with `eslint-config-next` |
 
 ## Pages
 
 | Route | Description |
 | --- | --- |
-| `/` | Landing page: hero, framework support, feature overview |
+| `/` | Landing page: hero, framework support, feature overview, comparison section and call to action |
 | `/docs` | Full documentation with a searchable sidebar and a mobile docs menu |
-| `/playground` | Interactive playground to try the table live |
-| `/changelog` | Release history with an animated timeline |
+| `/playground` | Interactive playground running the real `@liji-table/ui` table |
+| `/changelog` | Release history with a version sidebar and an animated timeline |
 
-## What's new
+The site also generates `robots.txt`, `sitemap.xml`, a favicon and an Open Graph image.
 
-- **Expanded docs**: new sections for state persistence, row and column pinning, row virtualization (100k+ rows), row grouping, advanced filtering (all 15 operators), inline cell editing and validation, and CSS theming.
-- **Toolbar reference**: input/output and props tables for `<liji-table-toolbar>` (Angular) and `<UniversalTableToolbar />` (React).
-- **Changelog**: the latest release is expanded by default and older releases are collapsed. The timeline has a continuous line, a white dot that travels up it turning each version marker green, and a green pulsing marker for the latest release.
-- **Navigation**: the sidebar and mobile docs menu list every section, and the redundant "skip to main content" link has been removed.
+### Documentation sections
+
+1. Installation
+2. Quick start (Vanilla JS, React, Angular)
+3. Column definition
+4. `@liji-table/core` API reference
+5. `@liji-table/react` API reference
+6. `@liji-table/angular` (including `<liji-table>` and `<liji-table-toolbar>`)
+7. `@liji-table/ui` (including `<UniversalTable />` and `<UniversalTableToolbar />`)
+8. Layout persistence
+9. Row and column pinning
+10. Row virtualization
+11. Row grouping
+12. Advanced filtering (14 operators)
+13. Inline cell editing and validation
+14. CSS theming
+
+### Changelog page
+
+- Reads the repository's root `CHANGELOG.md` at build time (`lib/changelog.ts`), so adding a release entry there and rebuilding is all that is needed.
+- The latest release is expanded by default and older releases are collapsed.
+- The timeline has a continuous line. A white dot travels up it, turning each version marker green as it passes. The latest release marker is green and pulses. The animation is disabled when the visitor prefers reduced motion.
+
+### Other features
+
+- Dark theme by default, with a light theme toggle. The choice is saved in `localStorage` under `liji-theme`.
+- Responsive navigation, including mobile menus for docs and versions.
+- Copy-to-clipboard install commands.
 
 ## Getting started
 
+Requirements: Node.js 20 or later and npm.
+
 ```bash
+cd website
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000/liji-table](http://localhost:3000/liji-table). Because the site uses `basePath: "/liji-table"`, every route is served under that prefix. To use another port, run `npx next dev -p 3001`.
+Open <http://localhost:3000/liji-table>. Every route is served under the `/liji-table` base path. To use another port: `npx next dev -p 3001`.
+
+> The site installs `@liji-table/*` from the npm registry (it is not part of the repo's npm workspaces). If `npm install` cannot find `0.0.10`, the packages have not been published yet. Publish them first, or install from the built packages in `../packages`.
 
 ## Scripts
 
@@ -35,22 +75,38 @@ Open [http://localhost:3000/liji-table](http://localhost:3000/liji-table). Becau
 | --- | --- |
 | `npm run dev` | Start the development server |
 | `npm run build` | Create the static export in `out/` |
-| `npm run start` | Serve a production build |
+| `npm run start` | Serve a production build (not used for the static export) |
+| `npm run lint` | Run ESLint |
+
+## Configuration
+
+| Setting | Where | Notes |
+| --- | --- | --- |
+| Base path `/liji-table` | `next.config.ts` | Applied to links and assets, and exposed as `NEXT_PUBLIC_BASE_PATH` |
+| `NEXT_PUBLIC_SITE_URL` | environment variable | Used by the sitemap and robots file. Defaults to `https://lijishwilson.in/liji-table` |
+| Unoptimized images | `next.config.ts` | Image optimization needs a server, which a static export does not have |
 
 ## Project structure
 
 ```
 website/
-├── app/            # Routes: home, docs, playground, changelog
-├── components/     # UI: Nav, DocsSidebar, ChangelogList, Playground, ...
-├── lib/            # Changelog parser and inline markdown renderer
-└── next.config.ts  # Static export + /liji-table base path
+├── app/                 # Routes: /, /docs, /playground, /changelog, plus robots, sitemap, icon and OG image
+├── components/          # Nav, Footer, Hero, DocsSidebar, ChangelogList, Playground, ThemeToggle, ...
+├── lib/                 # changelog.ts (CHANGELOG.md parser) and inline-markdown.tsx
+├── public/              # Static assets (logo, background)
+└── next.config.ts       # Static export and base path
 ```
 
-## Updating the changelog
+## Updating the documentation
 
-The changelog page reads the repository's root `CHANGELOG.md` at build time, so add a new release entry there and rebuild the site.
+- API docs live in `app/docs/page.tsx`. Verify every method, option and type against the package source before editing.
+- Sidebar and mobile navigation entries come from the `GROUPS` array in `components/DocsSidebar.tsx`.
+- The release list on `/changelog` comes from the root `CHANGELOG.md`.
 
 ## Deployment
 
-`next.config.ts` sets `output: "export"`, so `npm run build` writes plain static files to `out/`. Serve that folder at `/liji-table/` (for example with an nginx `alias`). No Node server is needed.
+`npm run build` writes plain static files to `out/`. Serve that folder at `/liji-table/`, for example with an nginx `alias`. No Node server is needed.
+
+---
+
+**Built by Lijish for developers who need powerful tables without the bloat**
