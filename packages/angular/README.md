@@ -341,7 +341,7 @@ All components are fully tested. The Angular package benefits from:
 
 ## 📄 License
 
-MIT License - Free for commercial and private use
+MIT © 2026 - Free for commercial and private use
 
 ---
 

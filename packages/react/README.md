@@ -382,7 +382,7 @@ applyLayoutSnapshot(snapshot)
 
 ## 📄 License
 
-MIT License
+MIT © 2026
 
 ---
 

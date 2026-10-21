@@ -289,7 +289,7 @@ const rows = table.getRows();
 
 ## 📄 License
 
-MIT License
+MIT © 2026
 
 ---
 

@@ -234,8 +234,7 @@ You can:
 
 ## 📄 License
 
-MIT License  
-Free for commercial and private use.
+MIT © 2026 - Free for commercial and private use.
 
 ---
 

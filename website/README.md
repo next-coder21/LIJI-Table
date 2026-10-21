@@ -107,6 +107,10 @@ website/
 
 `npm run build` writes plain static files to `out/`. Serve that folder at `/liji-table/`, for example with an nginx `alias`. No Node server is needed.
 
+## License
+
+MIT © 2026
+
 ---
 
 **Built by Lijish for developers who need powerful tables without the bloat**
